@@ -1,0 +1,12 @@
+# SPDX-License-Identifier: Apache-2.0
+
+option('HW_ISOLATION_BUSNAME', type: 'string',
+        value : 'org.open_power.HardwareIsolation',
+        description : 'The Dbus busname to own for hardware isolation'
+      )
+
+# Dbus object path should not end with "/"
+option('HW_ISOLATION_OBJPATH', type: 'string',
+        value : '/xyz/openbmc_project/hardware_isolation',
+        description : 'The hardware isolation dbus root'
+      )
