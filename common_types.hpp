@@ -4,6 +4,8 @@
 
 #include <sdbusplus/server/object.hpp>
 
+#include <string>
+
 namespace hw_isolation
 {
 namespace type

@@ -8,7 +8,6 @@
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
-#include <string>
 #include <tuple>
 #include <vector>
 
