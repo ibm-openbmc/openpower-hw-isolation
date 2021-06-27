@@ -12,6 +12,7 @@ project('hardware_isolation', 'cpp', 'c',
 
 # openbmc dependency packages list
 format = dependency('fmt')
+phosphor_dbus_interfaces = dependency('phosphor-dbus-interfaces')
 phosphor_logging = dependency('phosphor-logging')
 sdbusplus = dependency('sdbusplus')
 sdeventplus = dependency('sdeventplus')
@@ -33,11 +34,13 @@ configure_file(configuration : conf_data,
               )
 
 hardware_isolation_sources = [
+        'hardware_isolation_entry.cpp',
         'hardware_isolation_manager_main.cpp',
     ]
 
 hardware_isolation_dependencies = [
         format,
+        phosphor_dbus_interfaces,
         phosphor_logging,
         sdbusplus,
         sdeventplus
