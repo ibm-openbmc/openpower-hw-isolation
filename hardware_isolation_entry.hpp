@@ -6,6 +6,7 @@
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
+#include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
 #include <string>
 #include <tuple>
@@ -32,6 +33,8 @@ using AssociatedObjPat = std::string;
 using AssociationDef =
     std::vector<std::tuple<AsscDefFwdType, AsscDefRevType, AssociatedObjPat>>;
 
+using EpochTime = sdbusplus::xyz::openbmc_project::Time::server::EpochTime;
+
 /**
  * @class Entry
  *
@@ -40,9 +43,12 @@ using AssociationDef =
  * @details Implemented the below interfaces
  *          xyz.openbmc_project.HardwareIsolation.Entry
  *          xyz.openbmc_project.Association.Definitions
+ *          xyz.openbmc_project.Time.EpochTime
  *
  */
-class Entry : public type::ServerObject<EntryInterface, AssociationDefInterface>
+class Entry :
+    public type::ServerObject<EntryInterface, AssociationDefInterface,
+                              EpochTime>
 {
   public:
     Entry() = delete;
