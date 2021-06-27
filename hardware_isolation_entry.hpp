@@ -4,9 +4,12 @@
 
 #include "common_types.hpp"
 
+#include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
 
 #include <string>
+#include <tuple>
+#include <vector>
 
 namespace hw_isolation
 {
@@ -21,6 +24,14 @@ using EntrySeverity =
     sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type;
 using EntryResolved = bool;
 
+using AssociationDefInterface =
+    sdbusplus::xyz::openbmc_project::Association::server::Definitions;
+using AsscDefFwdType = std::string;
+using AsscDefRevType = std::string;
+using AssociatedObjPat = std::string;
+using AssociationDef =
+    std::vector<std::tuple<AsscDefFwdType, AsscDefRevType, AssociatedObjPat>>;
+
 /**
  * @class Entry
  *
@@ -28,9 +39,10 @@ using EntryResolved = bool;
  *
  * @details Implemented the below interfaces
  *          xyz.openbmc_project.HardwareIsolation.Entry
+ *          xyz.openbmc_project.Association.Definitions
  *
  */
-class Entry : public type::ServerObject<EntryInterface>
+class Entry : public type::ServerObject<EntryInterface, AssociationDefInterface>
 {
   public:
     Entry() = delete;
@@ -48,11 +60,14 @@ class Entry : public type::ServerObject<EntryInterface>
      *  @param[in] entryRecordId - the isolated hardware record id.
      *  @param[in] isolatedHwSeverity - the severity hardware isolation.
      *  @param[in] entryIsResolved - the status of hardware isolation.
+     *  @param[in] associationDef - the association to hold other dbus
+     *                              object path along with entry object.
      */
     Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
           const EntryId entryId, const EntryRecordId entryRecordId,
           const EntrySeverity isolatedHwSeverity,
-          const EntryResolved entryIsResolved);
+          const EntryResolved entryIsResolved,
+          const AssociationDef& associationDef);
 
   private:
     /** @brief The id of isolated hardware dbus entry */
