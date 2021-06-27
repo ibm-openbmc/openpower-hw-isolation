@@ -2,18 +2,10 @@
 
 #include "utils.hpp"
 
-#include <fmt/format.h>
-
-#include <phosphor-logging/elog-errors.hpp>
-
-#include <algorithm>
-
 namespace hw_isolation
 {
 namespace utils
 {
-
-using namespace phosphor::logging;
 
 std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                                const std::string& path,
