@@ -20,8 +20,8 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
              const EntrySeverity isolatedHwSeverity,
              const EntryResolved entryIsResolved,
              const AssociationDef& associationDef) :
-    type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime>(
-        bus, objPath.c_str(), true),
+    type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime,
+                       DeleteInterface>(bus, objPath.c_str(), true),
     _entryId(entryId), _entryRecordId(entryRecordId)
 {
     // Setting properties which are defined in EntryInterface
@@ -36,6 +36,15 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
     // Emit the signal for entry object creation since it deferred in
     // interface constructor
     this->emit_object_added();
+}
+
+void Entry::delete_()
+{
+    if (!resolved())
+    {
+        openpower_guard::clear(_entryRecordId);
+        resolved(true);
+    }
 }
 
 namespace utils

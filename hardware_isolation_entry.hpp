@@ -7,6 +7,7 @@
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
+#include <xyz/openbmc_project/Object/Delete/server.hpp>
 #include <xyz/openbmc_project/Time/EpochTime/server.hpp>
 
 #include <tuple>
@@ -35,6 +36,8 @@ using AssociationDef =
 
 using EpochTime = sdbusplus::xyz::openbmc_project::Time::server::EpochTime;
 
+using DeleteInterface = sdbusplus::xyz::openbmc_project::Object::server::Delete;
+
 /**
  * @class Entry
  *
@@ -44,11 +47,12 @@ using EpochTime = sdbusplus::xyz::openbmc_project::Time::server::EpochTime;
  *          xyz.openbmc_project.HardwareIsolation.Entry
  *          xyz.openbmc_project.Association.Definitions
  *          xyz.openbmc_project.Time.EpochTime
+ *          xyz.openbmc_project.Object.Delete
  *
  */
 class Entry :
     public type::ServerObject<EntryInterface, AssociationDefInterface,
-                              EpochTime>
+                              EpochTime, DeleteInterface>
 {
   public:
     Entry() = delete;
@@ -74,6 +78,14 @@ class Entry :
           const EntrySeverity isolatedHwSeverity,
           const EntryResolved entryIsResolved,
           const AssociationDef& associationDef);
+
+    /**
+     *  @brief Mark this object as resolved
+     *
+     *  @return NULL
+     *
+     */
+    void delete_() override;
 
   private:
     /** @brief The id of isolated hardware dbus entry */
