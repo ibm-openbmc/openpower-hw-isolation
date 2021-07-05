@@ -65,6 +65,27 @@ EntrySeverity getEntrySeverityType(const openpower_guard::GardType gardType)
     }
 }
 
+openpower_guard::GardType getGuardType(const EntrySeverity severity)
+{
+    switch (severity)
+    {
+        case EntrySeverity::Critical:
+            return openpower_guard::GardType::GARD_Fatal;
+        case EntrySeverity::Manual:
+            return openpower_guard::GardType::GARD_User_Manual;
+        case EntrySeverity::Warning:
+            return openpower_guard::GardType::GARD_Predictive;
+
+        default:
+            log<level::ERR>(
+                fmt::format("Unsupported EntrySeverity [{}] "
+                            "was given to the get openpower gard type",
+                            EntryInterface::convertTypeToString(severity))
+                    .c_str());
+            return openpower_guard::GardType::GARD_Predictive;
+    }
+}
+
 } // namespace utils
 } // namespace entry
 } // namespace hw_isolation
