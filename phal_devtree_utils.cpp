@@ -104,6 +104,19 @@ std::optional<LocationCode> getUnexpandedLocCode(const std::string& locCode)
     return unExpandedLocCode;
 }
 
+DevTreePhysPath getPhysicalPath(struct pdbg_target* isolateHw)
+{
+    ATTR_PHYS_BIN_PATH_Type physPath;
+    if (DT_GET_PROP(ATTR_PHYS_BIN_PATH, isolateHw, physPath))
+    {
+        throw std::runtime_error(
+            std::string("Failed to get ATTR_PHYS_BIN_PATH") +
+            pdbg_target_path(isolateHw));
+    }
+    return DevTreePhysPath(physPath,
+                           physPath + sizeof(physPath) / sizeof(physPath[0]));
+}
+
 namespace lookup_func
 {
 CanGetPhysPath mruId(struct pdbg_target* pdbgTgt, InstanceId instanceId,

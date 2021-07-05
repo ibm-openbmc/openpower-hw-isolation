@@ -19,6 +19,7 @@ namespace devtree
 {
 
 using namespace hw_isolation::type;
+using DevTreePhysPath = std::vector<uint8_t>;
 
 /**
  * @brief API to init PHAL (POWER Hardware Abstraction Layer)
@@ -40,6 +41,17 @@ void initPHAL();
  *         empty optional on failure.
  */
 std::optional<LocationCode> getUnexpandedLocCode(const std::string& locCode);
+
+/**
+ * @brief Used to get physical path of isolate hardware
+ *        phal cec device tree
+ *
+ * @param[in] isolateHw - pdbg target of isolate hardware
+ *
+ * @return DevTreePhysPath on success
+ *         Throw exception on failure
+ */
+DevTreePhysPath getPhysicalPath(struct pdbg_target* isolateHw);
 
 /**
  * @brief Used to add functions that will use to get to know
