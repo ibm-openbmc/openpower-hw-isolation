@@ -56,5 +56,37 @@ std::optional<GuardRecord> create(const EntityPath& entityPath,
     return std::nullopt;
 }
 
+void clear(const uint32_t recordId)
+{
+    try
+    {
+        libguard::clear(recordId);
+    }
+    catch (libguard::exception::GuardFileOpenFailed& e)
+    {
+        throw FileError::Open();
+    }
+    catch (libguard::exception::GuardFileReadFailed& e)
+    {
+        throw FileError::Read();
+    }
+    catch (libguard::exception::GuardFileWriteFailed& e)
+    {
+        throw FileError::Write();
+    }
+    catch (libguard::exception::InvalidEntityPath& e)
+    {
+        throw CommonError::InvalidArgument();
+    }
+    catch (libguard::exception::AlreadyGuarded& e)
+    {
+        throw HardwareIsolationError::IsolatedAlready();
+    }
+    catch (libguard::exception::GuardFileOverFlowed& e)
+    {
+        throw CommonError::NotAllowed();
+    }
+}
+
 } // namespace openpower_guard
 } // namespace hw_isolation

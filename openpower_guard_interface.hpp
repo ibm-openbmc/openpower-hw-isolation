@@ -30,5 +30,16 @@ std::optional<GuardRecord> create(const EntityPath& entityPath,
                                   const uint32_t errorLogId,
                                   const GardType guardType);
 
+/**
+ * @brief Wrapper function for libguard::clear to delete guard record
+ *        by using record id
+ *
+ * @param[in] recordId - The guard record id to delete from partition
+ *
+ * @return NULL on success
+ *         Throw exception on failure
+ */
+void clear(const uint32_t recordId);
+
 } // namespace openpower_guard
 } // namespace hw_isolation
