@@ -22,6 +22,7 @@ namespace hw_isolation
 {
 namespace devtree
 {
+using namespace phosphor::logging;
 
 using namespace phosphor::logging;
 
@@ -51,6 +52,56 @@ void initPHAL()
     {
         throw std::runtime_error("pdbg target initialization failed");
     }
+}
+
+std::optional<LocationCode> getUnexpandedLocCode(const std::string& locCode)
+{
+    // Location code should start with "U"
+    if (locCode[0] != 'U')
+    {
+        log<level::ERR>(fmt::format("Location code should start with \"U\""
+                                    " but, given location code [{}]",
+                                    locCode)
+                            .c_str());
+        return std::nullopt;
+    }
+
+    // Given location code length should be need to match with minimum length
+    // to drop expanded format in given location code.
+    constexpr uint8_t EXP_LOCATIN_CODE_MIN_LENGTH = 17;
+    if (locCode.length() < EXP_LOCATIN_CODE_MIN_LENGTH)
+    {
+        log<level::ERR>(fmt::format("Given location code [{}] is not meet "
+                                    "with minimum length [{}]",
+                                    locCode, EXP_LOCATIN_CODE_MIN_LENGTH)
+                            .c_str());
+        return std::nullopt;
+    }
+
+    // "-" should be there to seggregate all (FC, Node number and SE values)
+    // together.
+    // Note: Each (FC, Node number and SE) value can be seggregate by "."
+    // but, cec device tree just have unexpand format so, just skipping
+    // still first occurrence "-" and replacing with "fcs".
+    auto endPosOfFcs = locCode.find('-', EXP_LOCATIN_CODE_MIN_LENGTH);
+    if (endPosOfFcs == std::string::npos)
+    {
+        log<level::ERR>(fmt::format("Given location code [{}] is not "
+                                    "valid i.e could not find dash",
+                                    locCode)
+                            .c_str());
+        return std::nullopt;
+    }
+
+    std::string unExpandedLocCode("Ufcs");
+
+    if (locCode.length() > EXP_LOCATIN_CODE_MIN_LENGTH)
+    {
+        unExpandedLocCode.append(
+            locCode.substr(endPosOfFcs, std::string::npos));
+    }
+
+    return unExpandedLocCode;
 }
 
 namespace lookup_func

@@ -8,6 +8,7 @@ extern "C"
 }
 
 #include <functional>
+#include <optional>
 #include <string>
 
 namespace hw_isolation
@@ -24,6 +25,20 @@ using InstanceId = uint32_t;
  * @details PHAL should init to use phal cec device tree
  */
 void initPHAL();
+
+/**
+ * @brief Get unexpanded location code
+ *
+ * @details An api to get an unexpanded location code corresponding to
+ *          a given expanded location code. Unexpanded location codes
+ *          give the location of the FRU in the system.
+ *
+ * @param[in] locCode - Location code in expanded format.
+ *
+ * @return Location code as string which will be in un-expanded format or
+ *         empty optional on failure.
+ */
+std::optional<LocationCode> getUnexpandedLocCode(const std::string& locCode);
 
 /**
  * @brief Used to add functions that will use to get to know
