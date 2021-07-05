@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "isolatable_hardwares.hpp"
+
 #include "utils.hpp"
 
 #include <fmt/format.h>
@@ -101,6 +102,38 @@ LocationCode IsolatableHWs::getLocationCode(
 {
     return utils::getDBusPropertyVal<LocationCode>(
         _bus, dbusObjPath, "com.ibm.ipzvpd.Location", "LocationCode");
+}
+
+std::optional<sdbusplus::message::object_path>
+    IsolatableHWs::getParentFruObjPath(
+        const sdbusplus::message::object_path& isolateHardware,
+        const IsolatableHWs::HW_Details::HwId::ItemObjectName&
+            parentFruObjectName) const
+{
+    size_t startPosOfFruObj =
+        isolateHardware.str.find(parentFruObjectName._name);
+    if (startPosOfFruObj == std::string::npos)
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get parent fru object [{}] "
+                        "path for isolate hardware object path [{}].",
+                        parentFruObjectName._name, isolateHardware.str)
+                .c_str());
+        return std::nullopt;
+    }
+
+    size_t endPosOfFruObj = isolateHardware.str.find("/", startPosOfFruObj);
+    if (endPosOfFruObj == std::string::npos)
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get parent fru object [{}] "
+                        "path for isolate hardware object path [{}].",
+                        parentFruObjectName._name, isolateHardware.str)
+                .c_str());
+        return std::nullopt;
+    }
+
+    return isolateHardware.str.substr(0, endPosOfFruObj);
 }
 
 } // namespace isolatable_hws

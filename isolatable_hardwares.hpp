@@ -224,6 +224,21 @@ class IsolatableHWs
      */
     LocationCode
         getLocationCode(const sdbusplus::message::object_path& dbusObjPath);
+
+    /**
+     * @brief Used to get parent fru dbus object path
+     *        by using isolate hardware dbus object path
+     *
+     * @param[in] isolateHardware - isolate hardware dbus object path
+     * @param[in] parentFruObjectName - isolate hardware parent fru objec name
+     *
+     * @return Parent FRU dbus object path on success
+     *         or an empty optional if not found.
+     */
+    std::optional<sdbusplus::message::object_path> getParentFruObjPath(
+        const sdbusplus::message::object_path& isolateHardware,
+        const IsolatableHWs::HW_Details::HwId::ItemObjectName&
+            parentFruObjectName) const;
 };
 
 } // namespace isolatable_hws
