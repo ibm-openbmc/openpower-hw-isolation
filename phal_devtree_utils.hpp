@@ -7,6 +7,8 @@ extern "C"
 #include <libpdbg.h>
 }
 
+#include "common_types.hpp"
+
 #include <functional>
 #include <optional>
 #include <string>
@@ -16,8 +18,8 @@ namespace hw_isolation
 namespace devtree
 {
 
+using namespace hw_isolation::type;
 using LocationCode = std::string;
-using InstanceId = uint32_t;
 
 /**
  * @brief API to init PHAL (POWER Hardware Abstraction Layer)

@@ -14,5 +14,7 @@ namespace type
 template <typename... T>
 using ServerObject = typename sdbusplus::server::object::object<T...>;
 
+using InstanceId = uint32_t;
+
 } // namespace type
 } // namespace hw_isolation

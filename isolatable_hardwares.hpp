@@ -6,11 +6,14 @@
 #include "phal_devtree_utils.hpp"
 
 #include <map>
+#include <optional>
 
 namespace hw_isolation
 {
 namespace isolatable_hws
 {
+
+using namespace hw_isolation::type;
 
 /**
  * @class IsolatableHWs
@@ -178,6 +181,21 @@ class IsolatableHWs
      * @brief The list of isolatable hardwares
      */
     std::map<HW_Details::HwId, HW_Details> _isolatableHWsList;
+
+    /**
+     * @brief Helper function to segregate the instance name and id
+     *        from given hardware dbus object name.
+     *        Example: core0 -> std::pair<core, 0>
+     *
+     * @param[in] objName - hardware dbus object name to segregate into
+     *                      instance name and id
+     *
+     * @return pair<InstanceName, InstanceId> on success or
+     *         empty optional on failure
+     */
+    std::optional<
+        std::pair<IsolatableHWs::HW_Details::HwId::ItemObjectName, InstanceId>>
+        getInstanceInfo(const std::string& objName) const;
 };
 
 } // namespace isolatable_hws
