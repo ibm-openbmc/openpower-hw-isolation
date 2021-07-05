@@ -34,7 +34,7 @@ class IsolatableHWs
     /**
      * @brief Constructor to initialize isolatable hardware list
      */
-    IsolatableHWs();
+    IsolatableHWs(sdbusplus::bus::bus& bus);
 
     /**
      * @brief HW_Details used to hold the required hardware
@@ -178,6 +178,11 @@ class IsolatableHWs
 
   private:
     /**
+     * @brief Attached bus connection
+     */
+    sdbusplus::bus::bus& _bus;
+
+    /**
      * @brief The list of isolatable hardwares
      */
     std::map<HW_Details::HwId, HW_Details> _isolatableHWsList;
@@ -209,6 +214,16 @@ class IsolatableHWs
     std::optional<std::pair<HW_Details::HwId, HW_Details>>
         getIsotableHWDetails(const HW_Details::HwId& id) const;
 
+    /**
+     * @brief Used to get location code from given dbus object path
+     *
+     * @param[in] dbusObjPath - Dbus object path to get location code
+     *
+     * @return LocationCode on success
+     *         Throw exception on failure
+     */
+    LocationCode
+        getLocationCode(const sdbusplus::message::object_path& dbusObjPath);
 };
 
 } // namespace isolatable_hws

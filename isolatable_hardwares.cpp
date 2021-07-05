@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: Apache-2.0
 
 #include "isolatable_hardwares.hpp"
+#include "utils.hpp"
 
 #include <fmt/format.h>
 
@@ -13,7 +14,7 @@ namespace isolatable_hws
 
 using namespace phosphor::logging;
 
-IsolatableHWs::IsolatableHWs()
+IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
 {
     /**
      * @brief HwId consists with below ids.
@@ -93,6 +94,13 @@ std::optional<
         return *it;
     }
     return std::nullopt;
+}
+
+LocationCode IsolatableHWs::getLocationCode(
+    const sdbusplus::message::object_path& dbusObjPath)
+{
+    return utils::getDBusPropertyVal<LocationCode>(
+        _bus, dbusObjPath, "com.ibm.ipzvpd.Location", "LocationCode");
 }
 
 } // namespace isolatable_hws

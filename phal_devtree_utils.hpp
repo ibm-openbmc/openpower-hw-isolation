@@ -19,7 +19,6 @@ namespace devtree
 {
 
 using namespace hw_isolation::type;
-using LocationCode = std::string;
 
 /**
  * @brief API to init PHAL (POWER Hardware Abstraction Layer)
