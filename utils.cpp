@@ -2,6 +2,7 @@
 
 #include "utils.hpp"
 
+#include "openpower_guard_interface.hpp"
 #include "phal_devtree_utils.hpp"
 
 namespace hw_isolation
@@ -12,6 +13,12 @@ namespace utils
 void initExternalModules()
 {
     devtree::initPHAL();
+
+    // Don't initialize the phal device tree again, it will init through
+    // devtree::initPHAL because, phal device tree should initialize
+    // only once (as per pdbg expectation) in single process context.
+    // so, passing as false to libguard_init.
+    openpower_guard::libguard::libguard_init(false);
 }
 
 std::string getDBusServiceName(sdbusplus::bus::bus& bus,
