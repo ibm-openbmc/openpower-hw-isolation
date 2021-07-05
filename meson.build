@@ -36,6 +36,10 @@ conf_data.set_quoted('PHAL_DEVTREE', get_option('PHAL_DEVTREE'),
                      description : 'The PHAL CEC device tree to get hardware details'
                     )
 
+conf_data.set_quoted('HW_ISOLATION_ENTRY_OBJPATH', get_option('HW_ISOLATION_ENTRY_OBJPATH'),
+                      description : 'The hardware isolation dbus entry object path'
+                    )
+
 configure_file(configuration : conf_data,
                output : 'config.h'
               )

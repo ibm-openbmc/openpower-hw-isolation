@@ -1,17 +1,23 @@
 // SPDX-License-Identifier: Apache-2.0
 
+#include "config.h"
+
 #include "hardware_isolation_manager.hpp"
 
+#include "openpower_guard_interface.hpp"
 #include "utils.hpp"
 
 #include <fmt/format.h>
 
 #include <phosphor-logging/elog-errors.hpp>
 
+#include <filesystem>
+
 namespace hw_isolation
 {
 
 using namespace phosphor::logging;
+namespace fs = std::filesystem;
 
 Manager::Manager(sdbusplus::bus::bus& bus) : _bus(bus)
 {}
@@ -93,6 +99,61 @@ void Manager::setAvailableProperty(const std::string& dbusObjPath,
         throw sdbusplus::exception::SdBusError(
             const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
     }
+}
+
+std::optional<sdbusplus::message::object_path> Manager::createEntry(
+    const entry::EntryRecordId& recordId, const entry::EntryResolved& resolved,
+    const entry::EntrySeverity& severity, const std::string& isolatedHardware,
+    const std::string& bmcErrorLog, const bool deleteRecord)
+{
+    try
+    {
+        auto id = _lastEntryId + 1;
+        auto entryObjPath =
+            fs::path(HW_ISOLATION_ENTRY_OBJPATH) / std::to_string(id);
+
+        // Add association for isolated hardware inventory path
+        // Note: Association forward and reverse type are defined as per
+        // hardware isolation design document (aka guard) and hardware isolation
+        // entry dbus interface document for hardware and error object path
+        entry::AsscDefFwdType isolateHwFwdType("isolated_hw");
+        entry::AsscDefRevType isolatedHwRevType("isolated_hw_entry");
+        entry::AssociationDef associationDeftoHw;
+        associationDeftoHw.push_back(std::make_tuple(
+            isolateHwFwdType, isolatedHwRevType, isolatedHardware));
+
+        // Add errog log as Association if given
+        if (!bmcErrorLog.empty())
+        {
+            entry::AsscDefFwdType bmcErrorLogFwdType("isolated_hw_errorlog");
+            entry::AsscDefRevType bmcErrorLogRevType("isolated_hw_entry");
+            associationDeftoHw.push_back(std::make_tuple(
+                bmcErrorLogFwdType, bmcErrorLogRevType, bmcErrorLog));
+        }
+
+        _isolatedHardwares.insert(std::make_pair(
+            id, std::make_unique<entry::Entry>(_bus, entryObjPath, id, recordId,
+                                               severity, resolved,
+                                               associationDeftoHw)));
+
+        setAvailableProperty(isolatedHardware, false);
+
+        // Update the last entry id by using the created entry id.
+        _lastEntryId = id;
+        return entryObjPath.string();
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}], so failed to create entry", e.what())
+                .c_str());
+
+        if (deleteRecord)
+        {
+            openpower_guard::clear(recordId);
+        }
+    }
+    return std::nullopt;
 }
 
 } // namespace hw_isolation
