@@ -88,5 +88,46 @@ T getDBusPropertyVal(sdbusplus::bus::bus& bus, const std::string& objPath,
 
     return propertyVal;
 }
+
+/**
+ * @brief Set the given dbus property value
+ *
+ * @param[in] bus - Bus to attach to.
+ * @param[in] objPath - Dbus object path.
+ * @param[in] propInterface - Interface name of property.
+ * @param[in] propName - Name of property to set value.
+ *
+ * @return NULL on success
+ *         throw exception on failure.
+ */
+template <typename T>
+void setDBusPropertyVal(sdbusplus::bus::bus& bus, const std::string& objPath,
+                        const std::string& propInterface,
+                        const std::string& propName, const T& propVal)
+{
+
+    try
+    {
+        auto dbusServiceName = getDBusServiceName(bus, objPath, propInterface);
+
+        auto method =
+            bus.new_method_call(dbusServiceName.c_str(), objPath.c_str(),
+                                "org.freedesktop.DBus.Properties", "Set");
+
+        method.append(propInterface, propName, propVal);
+
+        auto reply = bus.call(method);
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] to set the given dbus property "
+                        "[{}] interface [{}] for object path [{}]",
+                        e.what(), propName, propInterface, objPath)
+                .c_str());
+        throw sdbusplus::exception::SdBusError(
+            const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+    }
+}
 } // namespace utils
 } // namespace hw_isolation
