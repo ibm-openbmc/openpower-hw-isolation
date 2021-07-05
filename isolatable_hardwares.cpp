@@ -78,5 +78,22 @@ std::optional<
     return std::nullopt;
 }
 
+std::optional<
+    std::pair<IsolatableHWs::HW_Details::HwId, IsolatableHWs::HW_Details>>
+    IsolatableHWs::getIsotableHWDetails(
+        const IsolatableHWs::HW_Details::HwId& id) const
+{
+
+    auto it = std::find_if(
+        _isolatableHWsList.begin(), _isolatableHWsList.end(),
+        [&id](const auto& isolatableHw) { return isolatableHw.first == id; });
+
+    if (it != _isolatableHWsList.end())
+    {
+        return *it;
+    }
+    return std::nullopt;
+}
+
 } // namespace isolatable_hws
 } // namespace hw_isolation

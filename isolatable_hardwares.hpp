@@ -196,6 +196,19 @@ class IsolatableHWs
     std::optional<
         std::pair<IsolatableHWs::HW_Details::HwId::ItemObjectName, InstanceId>>
         getInstanceInfo(const std::string& objName) const;
+
+    /**
+     * @brief Get the HwID based on given ItemInterfaceName or ItemObjectName
+     *        or PhalPdbgClassName.
+     *
+     * @param[in] id - The ID to find the HwID.
+     *
+     * @return the hardware details for the given HwID
+     *         or an empty optional if not found.
+     */
+    std::optional<std::pair<HW_Details::HwId, HW_Details>>
+        getIsotableHWDetails(const HW_Details::HwId& id) const;
+
 };
 
 } // namespace isolatable_hws
