@@ -136,5 +136,153 @@ std::optional<sdbusplus::message::object_path>
     return isolateHardware.str.substr(0, endPosOfFruObj);
 }
 
+std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
+    const sdbusplus::message::object_path& isolateHardware)
+{
+    try
+    {
+        auto isolateHwInstanceInfo =
+            getInstanceInfo(isolateHardware.filename());
+        if (!isolateHwInstanceInfo.has_value())
+        {
+            return std::nullopt;
+        }
+
+        auto isolateHwId = IsolatableHWs::HW_Details::HwId{
+            IsolatableHWs::HW_Details::HwId::ItemObjectName(
+                isolateHwInstanceInfo->first)};
+        auto isolateHwDetails = getIsotableHWDetails(isolateHwId);
+
+        if (!isolateHwDetails.has_value())
+        {
+            log<level::ERR>(
+                fmt::format("Given isolate hardware object name [{}] "
+                            "is not found in isolatable hardware list",
+                            isolateHardware.filename())
+                    .c_str());
+            return std::nullopt;
+        }
+
+        struct pdbg_target* isolateHwTarget;
+        devtree::lookup_func::CanGetPhysPath canGetPhysPath{false};
+
+        if (isolateHwDetails->second._isItFRU)
+        {
+            auto unExpandedLocCode{devtree::getUnexpandedLocCode(
+                getLocationCode(isolateHardware))};
+            if (!unExpandedLocCode.has_value())
+            {
+                return std::nullopt;
+            }
+
+            pdbg_for_each_class_target(
+                isolateHwDetails->first._pdbgClassName._name.c_str(),
+                isolateHwTarget)
+            {
+                canGetPhysPath = isolateHwDetails->second._physPathFuncLookUp(
+                    isolateHwTarget, isolateHwInstanceInfo->second,
+                    *unExpandedLocCode);
+
+                if (canGetPhysPath)
+                {
+                    break;
+                }
+            }
+        }
+        else
+        {
+            auto parentFruObjPath = getParentFruObjPath(
+                isolateHardware,
+                isolateHwDetails->second._parentFruHwId._itemObjectName);
+            if (!parentFruObjPath.has_value())
+            {
+                return std::nullopt;
+            }
+            auto parentFruInstanceInfo =
+                getInstanceInfo(parentFruObjPath->filename());
+            if (!parentFruInstanceInfo.has_value())
+            {
+                return std::nullopt;
+            }
+            auto parentFruHwDetails =
+                getIsotableHWDetails(isolateHwDetails->second._parentFruHwId);
+            if (!parentFruHwDetails.has_value())
+            {
+                log<level::ERR>(
+                    fmt::format("Parent fru details for the given isolate "
+                                "hardware object name [{}] is not found in "
+                                "isolatable hardware list",
+                                isolateHardware.filename())
+                        .c_str());
+                return std::nullopt;
+            }
+
+            auto unExpandedLocCode{devtree::getUnexpandedLocCode(
+                getLocationCode(*parentFruObjPath))};
+
+            if (!unExpandedLocCode.has_value())
+            {
+                return std::nullopt;
+            }
+
+            struct pdbg_target* parentFruTarget;
+
+            pdbg_for_each_class_target(
+                parentFruHwDetails->first._pdbgClassName._name.c_str(),
+                parentFruTarget)
+            {
+                canGetPhysPath = parentFruHwDetails->second._physPathFuncLookUp(
+                    parentFruTarget, parentFruInstanceInfo->second,
+                    *unExpandedLocCode);
+
+                if (!canGetPhysPath)
+                {
+                    continue;
+                }
+
+                pdbg_for_each_target(
+                    isolateHwDetails->first._pdbgClassName._name.c_str(),
+                    parentFruTarget, isolateHwTarget)
+                {
+                    canGetPhysPath =
+                        isolateHwDetails->second._physPathFuncLookUp(
+                            isolateHwTarget, isolateHwInstanceInfo->second,
+                            *unExpandedLocCode);
+
+                    if (canGetPhysPath)
+                    {
+                        break;
+                    }
+                }
+
+                // No use to check other parent, since it will enter here
+                // if identified the parent or,
+                // if found the isolate hardware to get physical path or,
+                // if not found the isolate hardware to get physical path
+                if (canGetPhysPath)
+                {
+                    break;
+                }
+            }
+        }
+
+        if (!canGetPhysPath)
+        {
+            log<level::ERR>(fmt::format("Given hardware [{}] is not found "
+                                        " in phal cec device tree",
+                                        isolateHardware.str)
+                                .c_str());
+            return std::nullopt;
+        }
+
+        return devtree::getPhysicalPath(isolateHwTarget);
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception [{}]", e.what()).c_str());
+        return std::nullopt;
+    }
+}
+
 } // namespace isolatable_hws
 } // namespace hw_isolation

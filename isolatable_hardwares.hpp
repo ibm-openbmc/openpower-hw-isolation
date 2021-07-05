@@ -176,6 +176,17 @@ class IsolatableHWs
         {}
     };
 
+    /**
+     * @brief Used to get physical path of isolating hardware
+     *
+     * @param[in] isolateHardware - isolate hardware dbus object path
+     *
+     * @return Physical path of isolating hardware on success
+     *         Empty optional on failure
+     */
+    std::optional<devtree::DevTreePhysPath>
+        getPhysicalPath(const sdbusplus::message::object_path& isolateHardware);
+
   private:
     /**
      * @brief Attached bus connection
