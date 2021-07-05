@@ -5,6 +5,7 @@
 #include "common_types.hpp"
 #include "hardware_isolation_entry.hpp"
 #include "isolatable_hardwares.hpp"
+#include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
 namespace hw_isolation
@@ -15,13 +16,18 @@ using CreateInterface =
 using IsolatedHardwares =
     std::map<entry::EntryId, std::unique_ptr<entry::Entry>>;
 
+using DeleteAllInterface =
+    sdbusplus::xyz::openbmc_project::Collection::server::DeleteAll;
+
 /**
  *  @class Manager
  *  @brief Hardware isolation manager implementation
  *  @details Implemetation for below interfaces
  *           xyz.openbmc_project.HardwareIsolation.Create
+ *           xyz.openbmc_project.Collection.DeleteAll
+ *
  */
-class Manager : public type::ServerObject<CreateInterface>
+class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
 {
   public:
     Manager() = delete;
@@ -70,6 +76,13 @@ class Manager : public type::ServerObject<CreateInterface>
         sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
             severity,
         sdbusplus::message::object_path bmcErrorLog) override;
+
+    /**
+     * @brief Delete all isolated hardware entires
+     *
+     * @return NULL
+     */
+    void deleteAll() override;
 
   private:
     /**
