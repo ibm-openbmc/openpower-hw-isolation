@@ -95,5 +95,16 @@ class Manager
                     const entry::EntrySeverity& severity,
                     const std::string& isolatedHardware,
                     const std::string& bmcErrorLog, const bool deleteRecord);
+
+    /**
+     * @brief Used to get to know whether hardware isolation is allowed
+     *
+     * @param[in] severity - the severity of hardware isolation
+     *
+     * @return Throw appropriate exception if not allowed
+     *         NULL if allowed
+     */
+    void isHwIsolationAllowed(const entry::EntrySeverity& severity);
 };
+
 } // namespace hw_isolation

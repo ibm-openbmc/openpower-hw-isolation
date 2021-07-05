@@ -19,5 +19,6 @@ using InstanceId = uint32_t;
 using LocationCode = std::string;
 
 namespace CommonError = sdbusplus::xyz::openbmc_project::Common::Error;
+
 } // namespace type
 } // namespace hw_isolation

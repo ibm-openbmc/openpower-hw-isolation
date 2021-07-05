@@ -4,12 +4,14 @@
 
 #include "hardware_isolation_manager.hpp"
 
+#include "common_types.hpp"
 #include "openpower_guard_interface.hpp"
 #include "utils.hpp"
 
 #include <fmt/format.h>
 
 #include <phosphor-logging/elog-errors.hpp>
+#include <xyz/openbmc_project/State/Chassis/server.hpp>
 
 #include <filesystem>
 
@@ -154,6 +156,27 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
         }
     }
     return std::nullopt;
+}
+
+void Manager::isHwIsolationAllowed(const entry::EntrySeverity& severity)
+{
+    if (severity == entry::EntrySeverity::Manual)
+    {
+        using Chassis = sdbusplus::xyz::openbmc_project::State::server::Chassis;
+
+        auto systemPowerState = utils::getDBusPropertyVal<std::string>(
+            _bus, "/xyz/openbmc_project/state/chassis0",
+            "xyz.openbmc_project.State.Chassis", "CurrentPowerState");
+
+        if (Chassis::convertPowerStateFromString(systemPowerState) !=
+            Chassis::PowerState::Off)
+        {
+            log<level::ERR>(fmt::format("Manual hardware isolation is allowed "
+                                        "only when chassis powerstate is off")
+                                .c_str());
+            throw type::CommonError::NotAllowed();
+        }
+    }
 }
 
 } // namespace hw_isolation
