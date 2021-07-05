@@ -10,3 +10,8 @@ option('HW_ISOLATION_OBJPATH', type: 'string',
         value : '/xyz/openbmc_project/hardware_isolation',
         description : 'The hardware isolation dbus root'
       )
+
+option('PHAL_DEVTREE', type: 'string',
+        value : '/var/lib/phosphor-software-manager/pnor/rw/DEVTREE',
+        description : 'The PHAL CEC device tree to get hardware details'
+      )

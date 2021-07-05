@@ -12,6 +12,7 @@ project('hardware_isolation', 'cpp', 'c',
 
 # openbmc dependency packages list
 format = dependency('fmt')
+libpdbg = meson.get_compiler('c').find_library('libpdbg')
 phosphor_dbus_interfaces = dependency('phosphor-dbus-interfaces')
 phosphor_logging = dependency('phosphor-logging')
 sdbusplus = dependency('sdbusplus')
@@ -29,6 +30,10 @@ conf_data.set_quoted('HW_ISOLATION_OBJPATH', get_option('HW_ISOLATION_OBJPATH'),
                       description : 'The hardware isolation dbus root'
                     )
 
+conf_data.set_quoted('PHAL_DEVTREE', get_option('PHAL_DEVTREE'),
+                     description : 'The PHAL CEC device tree to get hardware details'
+                    )
+
 configure_file(configuration : conf_data,
                output : 'config.h'
               )
@@ -36,11 +41,13 @@ configure_file(configuration : conf_data,
 hardware_isolation_sources = [
         'hardware_isolation_entry.cpp',
         'hardware_isolation_manager_main.cpp',
+        'phal_devtree_utils.cpp',
         'utils.cpp',
     ]
 
 hardware_isolation_dependencies = [
         format,
+        libpdbg,
         phosphor_dbus_interfaces,
         phosphor_logging,
         sdbusplus,

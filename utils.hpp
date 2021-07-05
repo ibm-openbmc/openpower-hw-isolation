@@ -16,6 +16,14 @@ namespace utils
 using namespace phosphor::logging;
 
 /**
+ * @brief API to initialize external modules (libraries)
+ *
+ * @return Nothing on success
+ *         Throw exception on failure.
+ */
+void initExternalModules();
+
+/**
  * @brief Get the Dbus service name
  *
  * @param[in] bus - Bus to attach to.

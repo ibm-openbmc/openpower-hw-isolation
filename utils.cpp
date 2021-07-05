@@ -2,10 +2,17 @@
 
 #include "utils.hpp"
 
+#include "phal_devtree_utils.hpp"
+
 namespace hw_isolation
 {
 namespace utils
 {
+
+void initExternalModules()
+{
+    devtree::initPHAL();
+}
 
 std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                                const std::string& path,
