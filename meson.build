@@ -42,6 +42,7 @@ configure_file(configuration : conf_data,
 hardware_isolation_sources = [
         'hardware_isolation_entry.cpp',
         'hardware_isolation_manager_main.cpp',
+        'isolatable_hardwares.cpp',
         'phal_devtree_utils.cpp',
         'utils.cpp',
     ]
