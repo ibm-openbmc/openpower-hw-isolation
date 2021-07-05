@@ -21,7 +21,9 @@ namespace hw_isolation
 using namespace phosphor::logging;
 namespace fs = std::filesystem;
 
-Manager::Manager(sdbusplus::bus::bus& bus) : _bus(bus)
+Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath) :
+    type::ServerObject<CreateInterface>(bus, objPath.c_str(), true), _bus(bus),
+    _lastEntryId(0), _isolatableHWs(bus)
 {}
 
 std::optional<uint32_t>
@@ -177,6 +179,75 @@ void Manager::isHwIsolationAllowed(const entry::EntrySeverity& severity)
             throw type::CommonError::NotAllowed();
         }
     }
+}
+
+sdbusplus::message::object_path Manager::create(
+    sdbusplus::message::object_path isolateHardware,
+    sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
+        severity)
+{
+    isHwIsolationAllowed(severity);
+
+    auto devTreePhysicalPath = _isolatableHWs.getPhysicalPath(isolateHardware);
+    if (!devTreePhysicalPath.has_value())
+    {
+        log<level::ERR>(fmt::format("Invalid argument [IsolateHardware: {}]",
+                                    isolateHardware.str)
+                            .c_str());
+        throw type::CommonError::InvalidArgument();
+    }
+
+    auto guardRecord = openpower_guard::create(
+        devTreePhysicalPath->data(), 0, entry::utils::getGuardType(severity));
+
+    auto entryPath = createEntry(guardRecord->recordId, false, severity,
+                                 isolateHardware.str, "", true);
+
+    if (!entryPath.has_value())
+    {
+        throw type::CommonError::InternalFailure();
+    }
+    return *entryPath;
+}
+
+sdbusplus::message::object_path Manager::createWithErrorLog(
+    sdbusplus::message::object_path isolateHardware,
+    sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
+        severity,
+    sdbusplus::message::object_path bmcErrorLog)
+{
+    isHwIsolationAllowed(severity);
+
+    auto devTreePhysicalPath = _isolatableHWs.getPhysicalPath(isolateHardware);
+    if (!devTreePhysicalPath.has_value())
+    {
+        log<level::ERR>(fmt::format("Invalid argument [IsolateHardware: {}]",
+                                    isolateHardware.str)
+                            .c_str());
+        throw type::CommonError::InvalidArgument();
+    }
+
+    auto eId = getEID(bmcErrorLog);
+    if (!eId.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Invalid argument [BmcErrorLog: {}]", bmcErrorLog.str)
+                .c_str());
+        throw type::CommonError::InvalidArgument();
+    }
+
+    auto guardRecord =
+        openpower_guard::create(devTreePhysicalPath->data(), *eId,
+                                entry::utils::getGuardType(severity));
+
+    auto entryPath = createEntry(guardRecord->recordId, false, severity,
+                                 isolateHardware.str, bmcErrorLog.str, true);
+
+    if (!entryPath.has_value())
+    {
+        throw type::CommonError::InternalFailure();
+    }
+    return *entryPath;
 }
 
 } // namespace hw_isolation

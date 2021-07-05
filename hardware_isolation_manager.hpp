@@ -4,18 +4,24 @@
 
 #include "common_types.hpp"
 #include "hardware_isolation_entry.hpp"
+#include "isolatable_hardwares.hpp"
+#include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
 namespace hw_isolation
 {
 
+using CreateInterface =
+    sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Create;
 using IsolatedHardwares =
     std::map<entry::EntryId, std::unique_ptr<entry::Entry>>;
 
 /**
  *  @class Manager
  *  @brief Hardware isolation manager implementation
+ *  @details Implemetation for below interfaces
+ *           xyz.openbmc_project.HardwareIsolation.Create
  */
-class Manager
+class Manager : public type::ServerObject<CreateInterface>
 {
   public:
     Manager() = delete;
@@ -26,9 +32,44 @@ class Manager
     virtual ~Manager() = default;
 
     /** @brief Constructor to put object onto bus at a dbus path.
+     *
      *  @param[in] bus - Bus to attach to.
+     *  @param[in] path - Path to attach at.
      */
-    Manager(sdbusplus::bus::bus& bus);
+    Manager(sdbusplus::bus::bus& bus, const std::string& objPath);
+
+    /**
+     *  @brief Implementation for Create
+     *
+     *  @param[in] isolateHardware - The hardware inventory path which is
+     *                               needs to isolate.
+     *  @param[in] severity - The severity of isolating hardware.
+     *
+     *  @return path The path of created
+     * xyz.openbmc_project.HardwareIsolation.Entry object.
+     */
+    sdbusplus::message::object_path create(
+        sdbusplus::message::object_path isolateHardware,
+        sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
+            severity) override;
+
+    /**
+     *  @brief Implementation for CreateWithErrorLog
+     *
+     *  @param[in] isolateHardware - The hardware inventory path which is needs
+     * to isolate.
+     *  @param[in] severity - The severity of isolating hardware.
+     *  @param[in] bmcErrorLog - The BMC error log caused the isolation of
+     * hardware.
+     *
+     *  @return path The path of created
+     * xyz.openbmc_project.HardwareIsolation.Entry object.
+     */
+    sdbusplus::message::object_path createWithErrorLog(
+        sdbusplus::message::object_path isolateHardware,
+        sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
+            severity,
+        sdbusplus::message::object_path bmcErrorLog) override;
 
   private:
     /**
@@ -45,6 +86,11 @@ class Manager
      * @brief Isolated hardwares list
      */
     IsolatedHardwares _isolatedHardwares;
+
+    /**
+     * @brief Used to get isolatable hardware details
+     */
+    isolatable_hws::IsolatableHWs _isolatableHWs;
 
     /**
      * @brief Used to get EID (aka PEL ID) by using BMC log

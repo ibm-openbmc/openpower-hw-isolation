@@ -2,6 +2,9 @@
 
 #include "config.h"
 
+#include "hardware_isolation_manager.hpp"
+#include "utils.hpp"
+
 #include <fmt/format.h>
 
 #include <phosphor-logging/elog-errors.hpp>
@@ -12,6 +15,8 @@ int main()
     auto eventLoopRet = 0;
     try
     {
+        hw_isolation::utils::initExternalModules();
+
         auto bus = sdbusplus::bus::new_default();
         bus.request_name(HW_ISOLATION_BUSNAME);
 
@@ -22,6 +27,8 @@ int main()
         // isolation manager.
         sdbusplus::server::manager::manager objManager(bus,
                                                        HW_ISOLATION_OBJPATH);
+
+        hw_isolation::Manager hardware_isolation_mgr(bus, HW_ISOLATION_OBJPATH);
 
         // The below statement should be last to enter this app into the loop
         // to process dbus services.
