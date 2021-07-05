@@ -2,12 +2,18 @@
 
 #include "hardware_isolation_entry.hpp"
 
+#include <fmt/format.h>
+
+#include <phosphor-logging/elog-errors.hpp>
+
 #include <ctime>
 
 namespace hw_isolation
 {
 namespace entry
 {
+
+using namespace phosphor::logging;
 
 Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
              const EntryId entryId, const EntryRecordId entryRecordId,
@@ -32,5 +38,33 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
     this->emit_object_added();
 }
 
+namespace utils
+{
+
+EntrySeverity getEntrySeverityType(const openpower_guard::GardType gardType)
+{
+    switch (gardType)
+    {
+        case openpower_guard::GardType::GARD_Unrecoverable:
+        case openpower_guard::GardType::GARD_Fatal:
+            return EntrySeverity::Critical;
+
+        case openpower_guard::GardType::GARD_User_Manual:
+            return EntrySeverity::Manual;
+
+        case openpower_guard::GardType::GARD_Predictive:
+            return EntrySeverity::Warning;
+
+        default:
+            log<level::ERR>(
+                fmt::format("Unsupported GardType [{}] was given ",
+                            "to get the hardware isolation entry severity type",
+                            gardType)
+                    .c_str());
+            return EntrySeverity::Warning;
+    }
+}
+
+} // namespace utils
 } // namespace entry
 } // namespace hw_isolation

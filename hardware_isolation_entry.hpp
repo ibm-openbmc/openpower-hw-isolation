@@ -3,6 +3,7 @@
 #pragma once
 
 #include "common_types.hpp"
+#include "openpower_guard_interface.hpp"
 
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
@@ -86,5 +87,21 @@ class Entry :
 
 }; // end of Entry class
 
+namespace utils
+{
+/**
+ * @brief Helper function to get EntrySeverity based on
+ *        the given GardType
+ *
+ * @param[in] gardType openpower gard type
+ *
+ * @return EntrySeverity
+ *
+ * @note This function will return EntrySeverity::Warning
+ * if the given GardType is not found in conversion switch block
+ */
+EntrySeverity getEntrySeverityType(const openpower_guard::GardType gardType);
+
+} // namespace utils
 } // namespace entry
 } // namespace hw_isolation
