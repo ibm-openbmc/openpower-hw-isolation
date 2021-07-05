@@ -48,4 +48,51 @@ std::optional<uint32_t>
     return std::nullopt;
 }
 
+void Manager::setAvailableProperty(const std::string& dbusObjPath,
+                                   bool availablePropVal)
+{
+    /**
+     * Make sure "Availablity" interface is implemented for the given
+     * dbus object path and don't throw an exception if the interface or
+     * property "Available" is not implemented since "Available" property
+     * update requires only for few hardware which are going isolate from
+     * external interface i.e Redfish
+     */
+    constexpr auto availablityIface =
+        "xyz.openbmc_project.State.Decorator.Availablity";
+
+    // Using two try and catch block to avoid more trace for same issue
+    // since using common utils API "setDBusPropertyVal"
+    try
+    {
+        utils::getDBusServiceName(_bus, dbusObjPath, availablityIface);
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        if (std::string(e.name()) ==
+            std::string("xyz.openbmc_project.Common.Error.ResourceNotFound"))
+        {
+            return;
+        }
+        throw sdbusplus::exception::SdBusError(
+            const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+    }
+
+    try
+    {
+        utils::setDBusPropertyVal<bool>(_bus, dbusObjPath, availablityIface,
+                                        "Available", availablePropVal);
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        if (std::string(e.name()) ==
+            std::string("org.freedesktop.DBus.Error.UnknownProperty"))
+        {
+            return;
+        }
+        throw sdbusplus::exception::SdBusError(
+            const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+    }
+}
+
 } // namespace hw_isolation

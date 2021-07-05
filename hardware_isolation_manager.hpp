@@ -44,5 +44,22 @@ class Manager
      */
     std::optional<uint32_t>
         getEID(const sdbusplus::message::object_path& bmcErrorLog) const;
+
+    /**
+     * @brief Used to set the Available property value by using given
+     *        dbus object path
+     *
+     * @param[in] dbusObjPath - The object path to set available property value
+     * @param[in] availablePropVal - set the available property value
+     *
+     * @return NULL on success
+     *         Throw exception on failure
+     *
+     * @note It will set available property value if found the available
+     *       property in the given object path. If not found then it will just
+     *       add the trace and won't throw exception.
+     */
+    void setAvailableProperty(const std::string& dbusObjPath,
+                              bool availablePropVal);
 };
 } // namespace hw_isolation
