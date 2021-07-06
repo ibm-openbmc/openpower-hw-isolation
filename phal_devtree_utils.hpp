@@ -8,6 +8,7 @@ extern "C"
 }
 
 #include "common_types.hpp"
+#include "openpower_guard_interface.hpp"
 
 #include <functional>
 #include <optional>
@@ -86,6 +87,17 @@ std::pair<LocationCode, InstanceId> getFRUDetails(struct pdbg_target* fruTgt);
  *         Throw exception on failure
  */
 InstanceId getHwInstIdFromDevTree(struct pdbg_target* devTreeTgt);
+
+/**
+ * @brief Helper function to get raw data from openpower Entity path
+ *
+ * @param[in] entityPath - The hardware entity path to get raw data
+ *
+ * @return DevTreePhysPath on success
+ *         Throw exception on failure
+ */
+DevTreePhysPath
+    convertEntityPathIntoRawData(const openpower_guard::EntityPath& entityPath);
 
 /**
  * @brief Used to add functions that will use to get to know

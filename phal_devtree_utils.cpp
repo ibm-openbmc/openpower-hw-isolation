@@ -281,6 +281,30 @@ InstanceId getHwInstIdFromDevTree(struct pdbg_target* devTreeTgt)
     return instanceId;
 }
 
+DevTreePhysPath
+    convertEntityPathIntoRawData(const openpower_guard::EntityPath& entityPath)
+{
+    DevTreePhysPath rawData;
+    rawData.push_back(entityPath.type_size);
+
+    /**
+     * Path elements size stored at last 4bits in type_size member.
+     * For every iteration, increasing 2 byte to store PathElement value
+     * i.e target type enum value and instance id as raw data.
+     *
+     * @note PathElement targetType and instance member data type are
+     * uint8_t. so, directly assigning each value as one byte to make
+     * raw data (binary) format. If data types are changed for those fields
+     * in PathElements then this logic also needs to revisit.
+     */
+    for (int i = 0; i < (0x0F & entityPath.type_size); i++)
+    {
+        rawData.push_back(entityPath.pathElements[i].targetType);
+        rawData.push_back(entityPath.pathElements[i].instance);
+    }
+    return rawData;
+}
+
 namespace lookup_func
 {
 CanGetPhysPath mruId(struct pdbg_target* pdbgTgt, InstanceId instanceId,
