@@ -383,6 +383,170 @@ std::optional<std::vector<sdbusplus::message::object_path>>
     return listOfChildsInventoryPath;
 }
 
+std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
+    const devtree::DevTreePhysPath& physicalPath)
+{
+    try
+    {
+        auto isolatedHwTgt = devtree::getPhalDevTreeTgt(physicalPath);
+        if (!isolatedHwTgt.has_value())
+        {
+            return std::nullopt;
+        }
+        auto isolatedHwTgtDevTreePath = pdbg_target_path(*isolatedHwTgt);
+
+        std::string isolatedHwPdbgClass =
+            pdbg_target_class_name(*isolatedHwTgt);
+
+        auto isolatedHwId = IsolatableHWs::HW_Details::HwId{
+            IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
+                isolatedHwPdbgClass)};
+        auto isolatedHwDetails = getIsotableHWDetails(isolatedHwId);
+
+        if (!isolatedHwDetails.has_value())
+        {
+            log<level::ERR>(
+                fmt::format("Isolated hardware [{}] pdbg class [{}] is "
+                            "not found in isolatable hardware list",
+                            isolatedHwTgtDevTreePath, isolatedHwPdbgClass)
+                    .c_str());
+            return std::nullopt;
+        }
+
+        sdbusplus::message::object_path isolatedHwInventoryPath;
+        if (isolatedHwDetails->second._isItFRU)
+        {
+            auto isolatedHwInfo = devtree::getFRUDetails(*isolatedHwTgt);
+            auto isolateHw = isolatedHwDetails->first._itemObjectName._name +
+                             (isolatedHwInfo.second == 0xFFFFFFFF
+                                  ? ""
+                                  : std::to_string(isolatedHwInfo.second));
+
+            auto inventoryPathList =
+                getInventoryPathsByLocCode(isolatedHwInfo.first);
+
+            if (!inventoryPathList.has_value())
+            {
+                return std::nullopt;
+            }
+
+            auto isolateHwPath = std::find_if(
+                inventoryPathList->begin(), inventoryPathList->end(),
+                [&isolateHw, &isolatedHwDetails, this](const auto& path) {
+                    return isolatedHwDetails->second._invPathFuncLookUp(
+                        path, isolateHw, this->_bus);
+                });
+
+            if (isolateHwPath == inventoryPathList->end())
+            {
+                log<level::ERR>(fmt::format("Failed to get inventory path for "
+                                            "given device path [{}]",
+                                            isolatedHwTgtDevTreePath)
+                                    .c_str());
+                return std::nullopt;
+            }
+
+            isolatedHwInventoryPath = *isolateHwPath;
+        }
+        else
+        {
+            auto parentFruTgt = getParentFruPhalDevTreeTgt(*isolatedHwTgt);
+            if (!parentFruTgt.has_value())
+            {
+                return std::nullopt;
+            }
+
+            std::string parentFruTgtPdbgClass =
+                pdbg_target_class_name(*parentFruTgt);
+            auto parentFruHwId = IsolatableHWs::HW_Details::HwId{
+                IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
+                    parentFruTgtPdbgClass)};
+
+            auto parentFruHwDetails = getIsotableHWDetails(parentFruHwId);
+            if (!parentFruHwDetails.has_value())
+            {
+                log<level::ERR>(
+                    fmt::format(
+                        "Isolated hardware [{}] parent fru pdbg "
+                        "class [{}] is not found in isolatable hardware list",
+                        isolatedHwTgtDevTreePath, parentFruTgtPdbgClass)
+                        .c_str());
+                return std::nullopt;
+            }
+
+            auto parentFruHwInfo = devtree::getFRUDetails(*parentFruTgt);
+            auto parentFruHw = parentFruHwDetails->first._itemObjectName._name +
+                               (parentFruHwInfo.second == 0xFFFFFFFF
+                                    ? ""
+                                    : std::to_string(parentFruHwInfo.second));
+
+            auto parentFruInventoryPathList =
+                getInventoryPathsByLocCode(parentFruHwInfo.first);
+            if (!parentFruInventoryPathList.has_value())
+            {
+                return std::nullopt;
+            }
+
+            auto parentFruPath = std::find_if(
+                parentFruInventoryPathList->begin(),
+                parentFruInventoryPathList->end(),
+                [&parentFruHw, &parentFruHwDetails, this](const auto& path) {
+                    return parentFruHwDetails->second._invPathFuncLookUp(
+                        path, parentFruHw, this->_bus);
+                });
+            if (parentFruPath == parentFruInventoryPathList->end())
+            {
+                log<level::ERR>(
+                    fmt::format("Failed to get get parent fru inventory path "
+                                "for given device path [{}]",
+                                isolatedHwTgtDevTreePath)
+                        .c_str());
+                return std::nullopt;
+            }
+
+            auto childsInventoryPath = getChildsInventoryPath(
+                *parentFruPath, isolatedHwDetails->first._interfaceName._name);
+
+            if (!childsInventoryPath.has_value())
+            {
+                return std::nullopt;
+            }
+
+            auto isolateHwInstId =
+                devtree::getHwInstIdFromDevTree(*isolatedHwTgt);
+
+            auto isolateHw = isolatedHwDetails->first._itemObjectName._name +
+                             (isolateHwInstId == 0xFFFFFFFF
+                                  ? ""
+                                  : std::to_string(isolateHwInstId));
+
+            auto isolateHwPath = std::find_if(
+                childsInventoryPath->begin(), childsInventoryPath->end(),
+                [&isolateHw, &isolatedHwDetails, this](const auto& path) {
+                    return isolatedHwDetails->second._invPathFuncLookUp(
+                        path, isolateHw, this->_bus);
+                });
+
+            if (isolateHwPath == childsInventoryPath->end())
+            {
+                log<level::ERR>(fmt::format("Failed to get inventory path for "
+                                            "given device path [{}]",
+                                            isolatedHwTgtDevTreePath)
+                                    .c_str());
+                return std::nullopt;
+            }
+
+            isolatedHwInventoryPath = *isolateHwPath;
+        }
+        return isolatedHwInventoryPath;
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception [{}]", e.what()).c_str());
+        return std::nullopt;
+    }
+}
+
 } // namespace isolatable_hws
 
 namespace inv_path_lookup_func

@@ -228,6 +228,17 @@ class IsolatableHWs
     std::optional<devtree::DevTreePhysPath>
         getPhysicalPath(const sdbusplus::message::object_path& isolateHardware);
 
+    /**
+     * @brief Used to get the inventory path of isolated hardware
+     *
+     * @param[in] physicalPath - The physical path of isolated hardware
+     *
+     * @return The isolated hardware inventory path on success
+     *         Empty optional on failure
+     */
+    std::optional<sdbusplus::message::object_path>
+        getInventoryPath(const devtree::DevTreePhysPath& physicalPath);
+
   private:
     /**
      * @brief Attached bus connection
