@@ -13,6 +13,7 @@ namespace libguard = openpower::guard;
 using GardType = libguard::GardType;
 using GuardRecord = libguard::GuardRecord;
 using EntityPath = libguard::EntityPath;
+using GuardRecords = libguard::GuardRecords;
 
 /**
  * @brief Wrapper function for libguard::create to create guard record
@@ -40,6 +41,14 @@ std::optional<GuardRecord> create(const EntityPath& entityPath,
  *         Throw exception on failure
  */
 void clear(const uint32_t recordId);
+
+/**
+ * @brief Wrapper function for libguard::getAll to get all guard records
+ *
+ * @return The all guard records on success
+ *         Throw exception on failure
+ */
+GuardRecords getAll();
 
 } // namespace openpower_guard
 } // namespace hw_isolation

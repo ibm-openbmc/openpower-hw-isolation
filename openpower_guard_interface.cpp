@@ -87,5 +87,40 @@ void clear(const uint32_t recordId)
     }
 }
 
+GuardRecords getAll()
+{
+    GuardRecords records;
+    try
+    {
+        records = libguard::getAll();
+    }
+    catch (libguard::exception::GuardFileOpenFailed& e)
+    {
+        throw FileError::Open();
+    }
+    catch (libguard::exception::GuardFileReadFailed& e)
+    {
+        throw FileError::Read();
+    }
+    catch (libguard::exception::GuardFileWriteFailed& e)
+    {
+        throw FileError::Write();
+    }
+    catch (libguard::exception::InvalidEntityPath& e)
+    {
+        throw type::CommonError::InvalidArgument();
+    }
+    catch (libguard::exception::AlreadyGuarded& e)
+    {
+        throw HardwareIsolationError::IsolatedAlready();
+    }
+    catch (libguard::exception::GuardFileOverFlowed& e)
+    {
+        throw type::CommonError::NotAllowed();
+    }
+
+    return records;
+}
+
 } // namespace openpower_guard
 } // namespace hw_isolation
