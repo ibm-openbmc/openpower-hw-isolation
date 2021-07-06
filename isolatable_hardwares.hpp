@@ -250,6 +250,19 @@ class IsolatableHWs
         const sdbusplus::message::object_path& isolateHardware,
         const IsolatableHWs::HW_Details::HwId::ItemObjectName&
             parentFruObjectName) const;
+
+    /**
+     * @brief Used to get the list of inventory object path by using
+     *        given unexpanded location code
+     *
+     * @param[in] unexpandedLocCode - The unexpanded location code to get
+     *                                the list of inventory object path
+     *
+     * @return The list of inventory object path on success
+     *         Empty optional on failure
+     */
+    std::optional<std::vector<sdbusplus::message::object_path>>
+        getInventoryPathsByLocCode(const LocationCode& unexpandedLocCode);
 };
 
 } // namespace isolatable_hws
