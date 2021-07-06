@@ -4,11 +4,14 @@
 
 #include <libguard/guard_interface.hpp>
 
+#include <filesystem>
+
 namespace hw_isolation
 {
 namespace openpower_guard
 {
 
+namespace fs = std::filesystem;
 namespace libguard = openpower::guard;
 using GardType = libguard::GardType;
 using GuardRecord = libguard::GuardRecord;
@@ -50,5 +53,12 @@ void clear(const uint32_t recordId);
  */
 GuardRecords getAll();
 
+/**
+ * @brief Wrapper function for libguard::getGuardFilePath
+ *
+ * @return The guard record file path on success
+ *         Throw exception on failure
+ */
+const fs::path getGuardFilePath();
 } // namespace openpower_guard
 } // namespace hw_isolation
