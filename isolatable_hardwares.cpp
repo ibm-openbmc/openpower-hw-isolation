@@ -346,5 +346,39 @@ std::optional<struct pdbg_target*>
     return parentFruTarget;
 }
 
+std::optional<std::vector<sdbusplus::message::object_path>>
+    IsolatableHWs::getChildsInventoryPath(
+        const sdbusplus::message::object_path& parentObjPath,
+        const std::string& interfaceName)
+{
+    std::vector<sdbusplus::message::object_path> listOfChildsInventoryPath;
+
+    try
+    {
+        auto dbusServiceName = utils::getDBusServiceName(
+            _bus, type::objectMapperPath, type::objectMapperName);
+
+        auto method = _bus.new_method_call(
+            dbusServiceName.c_str(), type::objectMapperPath,
+            type::objectMapperName, "GetSubTreePaths");
+
+        method.append(parentObjPath, 0, interfaceName);
+
+        auto resp = _bus.call(method);
+
+        resp.read(listOfChildsInventoryPath);
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] to get childs inventory path "
+                        "for given objPath[{}] interface[{}]",
+                        e.what(), parentObjPath.str, interfaceName)
+                .c_str());
+        return std::nullopt;
+    }
+    return listOfChildsInventoryPath;
+}
+
 } // namespace isolatable_hws
 } // namespace hw_isolation

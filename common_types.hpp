@@ -20,5 +20,8 @@ using LocationCode = std::string;
 
 namespace CommonError = sdbusplus::xyz::openbmc_project::Common::Error;
 
+constexpr auto objectMapperName = "xyz.openbmc_project.ObjectMapper";
+constexpr auto objectMapperPath = "/xyz/openbmc_project/object_mapper";
+
 } // namespace type
 } // namespace hw_isolation

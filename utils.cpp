@@ -25,15 +25,13 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                                const std::string& path,
                                const std::string& interface)
 {
-    constexpr auto objectMapperName = "xyz.openbmc_project.ObjectMapper";
-    constexpr auto objectMapperPath = "/xyz/openbmc_project/object_mapper";
-
     std::vector<std::pair<std::string, std::vector<std::string>>> servicesName;
 
     try
     {
-        auto method = bus.new_method_call(objectMapperName, objectMapperPath,
-                                          objectMapperName, "GetObject");
+        auto method =
+            bus.new_method_call(type::objectMapperName, type::objectMapperPath,
+                                type::objectMapperName, "GetObject");
 
         method.append(path);
         method.append(std::vector<std::string>({interface}));
