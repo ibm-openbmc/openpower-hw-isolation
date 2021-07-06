@@ -322,5 +322,29 @@ std::optional<std::vector<sdbusplus::message::object_path>>
     return listOfInventoryObjPaths;
 }
 
+std::optional<struct pdbg_target*>
+    IsolatableHWs::getParentFruPhalDevTreeTgt(struct pdbg_target* devTreeTgt)
+{
+    /**
+     * FIXME: Today, All FRU parts (units - both(chiplet and non-chiplet))
+     *        are modelled under the respective processor in cec device
+     *        tree so, if something changed then, need to revisit the
+     *        logic which is used to get the FRU details of FRU unit.
+     */
+    struct pdbg_target* parentFruTarget =
+        pdbg_target_parent("proc", devTreeTgt);
+    std::string fruUnitDevTreePath = pdbg_target_path(devTreeTgt);
+    if (parentFruTarget == nullptr)
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get the processor target from phal cec "
+                        "device tree for the given target [{}]",
+                        fruUnitDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+    return parentFruTarget;
+}
+
 } // namespace isolatable_hws
 } // namespace hw_isolation

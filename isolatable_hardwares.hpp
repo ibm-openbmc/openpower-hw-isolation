@@ -263,6 +263,19 @@ class IsolatableHWs
      */
     std::optional<std::vector<sdbusplus::message::object_path>>
         getInventoryPathsByLocCode(const LocationCode& unexpandedLocCode);
+
+    /**
+     * @brief Used to get the parent fru phal cec device tree target
+     *        by using isolated phal cec device tree target
+     *
+     * @param[in] devTreeTgt - The phal cec device tree target to get
+     *                         the parent fru target
+     *
+     * @return The parent fru device tree target on success
+     *         Empty optional on failure
+     */
+    std::optional<struct pdbg_target*>
+        getParentFruPhalDevTreeTgt(struct pdbg_target* devTreeTgt);
 };
 
 } // namespace isolatable_hws
