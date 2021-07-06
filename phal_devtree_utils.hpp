@@ -67,6 +67,17 @@ std::optional<struct pdbg_target*>
     getPhalDevTreeTgt(const DevTreePhysPath& physicalPath);
 
 /**
+ * @brief Used to get the FRU information (location code and instance id)
+ *        from the phal cec device tree by using phal cec device tree target
+ *
+ * @param[in] fruTgt - The FRU target to get its information
+ *
+ * @return pair<LocationCode, InstanceId> on success
+ *         Throw exception on failure
+ */
+std::pair<LocationCode, InstanceId> getFRUDetails(struct pdbg_target* fruTgt);
+
+/**
  * @brief Used to add functions that will use to get to know
  *        whether the given target (aka device tree node) can
  *        be used to get the physical path of expected hardware.

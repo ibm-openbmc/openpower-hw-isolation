@@ -215,6 +215,27 @@ std::optional<struct pdbg_target*>
     return cecDevTreeHw.reqDevTreeHw;
 }
 
+std::pair<LocationCode, InstanceId> getFRUDetails(struct pdbg_target* fruTgt)
+{
+    ATTR_LOCATION_CODE_Type frulocCode;
+    if (DT_GET_PROP(ATTR_LOCATION_CODE, fruTgt, frulocCode))
+    {
+        throw std::runtime_error(
+            std::string("Failed to get ATTR_LOCATION_CODE from ") +
+            pdbg_target_path(fruTgt));
+    }
+
+    InstanceId instanceId = 0xFFFFFFFF;
+    ATTR_MRU_ID_Type mruId;
+    if (!DT_GET_PROP(ATTR_MRU_ID, fruTgt, mruId))
+    {
+        // Last two byte (from MSB) of MRU_ID having instance number
+        instanceId = mruId & 0xFFFF;
+    }
+
+    return std::make_pair(LocationCode(frulocCode), instanceId);
+}
+
 namespace lookup_func
 {
 CanGetPhysPath mruId(struct pdbg_target* pdbgTgt, InstanceId instanceId,
