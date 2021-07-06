@@ -5,6 +5,7 @@
 #include "common_types.hpp"
 #include "hardware_isolation_entry.hpp"
 #include "isolatable_hardwares.hpp"
+#include "openpower_guard_interface.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
@@ -83,6 +84,15 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      * @return NULL
      */
     void deleteAll() override;
+
+    /**
+     * @brief Create dbus objects for isolated hardwares
+     *        from their persisted location.
+     *
+     * return NULL on success.
+     *        Throw exception on failure.
+     */
+    void restore();
 
   private:
     /**
@@ -175,6 +185,20 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      */
     std::optional<sdbusplus::message::object_path>
         getBMCLogPath(const uint32_t eid) const;
+
+    /**
+     * @brief Create dbus entry object for isolated hardware record
+     *
+     * @param[in] record - The isolated hardware record
+     *
+     * @return NULL on success
+     *
+     * @note The function will skip given isolated hardware to create
+     *       dbus entry if any failure since this is restoring mechanism
+     *       so the hardware isolation application need to create dbus entries
+     *       for all isolated hardware that is stored in the preserved location.
+     */
+    void createEntryForRecord(const openpower_guard::GuardRecord& record);
 };
 
 } // namespace hw_isolation

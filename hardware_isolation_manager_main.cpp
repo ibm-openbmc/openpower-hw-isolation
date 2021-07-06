@@ -30,6 +30,9 @@ int main()
 
         hw_isolation::Manager hardware_isolation_mgr(bus, HW_ISOLATION_OBJPATH);
 
+        // Restore the isolated hardwares from their persisted location.
+        hardware_isolation_mgr.restore();
+
         // The below statement should be last to enter this app into the loop
         // to process dbus services.
         eventLoopRet = event.loop();

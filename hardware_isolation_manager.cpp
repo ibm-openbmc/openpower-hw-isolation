@@ -5,7 +5,6 @@
 #include "hardware_isolation_manager.hpp"
 
 #include "common_types.hpp"
-#include "openpower_guard_interface.hpp"
 #include "utils.hpp"
 
 #include <fmt/format.h>
@@ -14,6 +13,8 @@
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 
 #include <filesystem>
+#include <iomanip>
+#include <sstream>
 
 namespace hw_isolation
 {
@@ -302,4 +303,94 @@ std::optional<sdbusplus::message::object_path>
     }
 }
 
+void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
+{
+    auto entityPathRawData =
+        devtree::convertEntityPathIntoRawData(record.targetId);
+    std::stringstream ss;
+    std::for_each(entityPathRawData.begin(), entityPathRawData.end(),
+                  [&ss](const auto& ele) {
+                      ss << std::setw(2) << std::setfill('0') << std::hex
+                         << (int)ele << " ";
+                  });
+
+    try
+    {
+        entry::EntryResolved resolved = false;
+        if (record.recordId == 0xFFFFFFFF)
+        {
+            resolved = true;
+        }
+
+        auto isolatedHwInventoryPath =
+            _isolatableHWs.getInventoryPath(entityPathRawData);
+
+        if (!isolatedHwInventoryPath.has_value())
+        {
+            log<level::ERR>(
+                fmt::format(
+                    "Skipping to restore a given isolated "
+                    "hardware [{}] : Due to failure to get inventory path",
+                    ss.str())
+                    .c_str());
+            return;
+        }
+
+        auto bmcErrorLogPath = getBMCLogPath(record.elogId);
+
+        if (!bmcErrorLogPath.has_value())
+        {
+            log<level::ERR>(
+                fmt::format(
+                    "Skipping to restore a given isolated "
+                    "hardware [{}] : Due to failure to BMC error log path "
+                    "by isolated hardware EID (aka PEL ID) [{}]",
+                    ss.str(), record.elogId)
+                    .c_str());
+            return;
+        }
+
+        auto entryPath = createEntry(
+            record.recordId, resolved,
+            entry::utils::getEntrySeverityType(
+                static_cast<openpower_guard::GardType>(record.errType)),
+            isolatedHwInventoryPath->str, bmcErrorLogPath->str, false);
+
+        if (!entryPath.has_value())
+        {
+            log<level::ERR>(
+                fmt::format(
+                    "Skipping to restore a given isolated "
+                    "hardware [{}] : Due to failure to create dbus entry",
+                    ss.str())
+                    .c_str());
+            return;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] : Skipping to restore a given isolated "
+                        "hardware [{}]",
+                        e.what(), ss.str())
+                .c_str());
+    }
+}
+
+void Manager::restore()
+{
+    openpower_guard::GuardRecords records = openpower_guard::getAll();
+
+    std::for_each(records.begin(), records.end(), [this](const auto& record) {
+        // Skipping fake record (GARD_Reconfig) because,
+        // fake record is created for internal purpose to
+        // to use by BMC and Hostboot
+        if (record.errType == openpower_guard::GardType::GARD_Reconfig)
+        {
+            return;
+        }
+
+        this->createEntryForRecord(record);
+    });
+}
 } // namespace hw_isolation
