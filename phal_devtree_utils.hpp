@@ -54,6 +54,19 @@ std::optional<LocationCode> getUnexpandedLocCode(const std::string& locCode);
 DevTreePhysPath getPhysicalPath(struct pdbg_target* isolateHw);
 
 /**
+ * @brief Used to get phal cec device tree target based on
+ *        the given hardware physical path which is isolated
+ *
+ * @param[in] physicalPath - the hardware physical path to get
+ *                           the phal cec device tree target
+ *
+ * @return The phal cec device tree target on success
+ *         Empty optional on failure
+ */
+std::optional<struct pdbg_target*>
+    getPhalDevTreeTgt(const DevTreePhysPath& physicalPath);
+
+/**
  * @brief Used to add functions that will use to get to know
  *        whether the given target (aka device tree node) can
  *        be used to get the physical path of expected hardware.

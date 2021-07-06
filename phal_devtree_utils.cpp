@@ -16,6 +16,8 @@ extern "C"
 
 #include <phosphor-logging/elog-errors.hpp>
 
+#include <iomanip>
+#include <sstream>
 #include <stdexcept>
 
 namespace hw_isolation
@@ -24,7 +26,26 @@ namespace devtree
 {
 using namespace phosphor::logging;
 
-using namespace phosphor::logging;
+/**
+ * Used to return in pdbg callback function.
+ * The value for constexpr is defined based on pdbg_target_traverse function
+ * usage.
+ */
+constexpr int continueTgtTraversal = 0;
+constexpr int requireIsolateHwFound = 1;
+
+struct CecDevTreeHw
+{
+    ATTR_PHYS_BIN_PATH_Type physBinPath;
+
+    struct pdbg_target* reqDevTreeHw;
+
+    CecDevTreeHw()
+    {
+        std::memset(&physBinPath, 0, sizeof(physBinPath));
+        reqDevTreeHw = nullptr;
+    }
+};
 
 void initPHAL()
 {
@@ -115,6 +136,83 @@ DevTreePhysPath getPhysicalPath(struct pdbg_target* isolateHw)
     }
     return DevTreePhysPath(physPath,
                            physPath + sizeof(physPath) / sizeof(physPath[0]));
+}
+
+/**
+ * @brief pdbg callback to identify a target based on the given
+ *        attribute
+ *
+ * @param[in] target current device tree target
+ * @param[in|out] userData for accessing|storing from|to user
+ *
+ * @return 0 to continue traverse, non-zero to stop traverse
+ */
+int pdbgCallbackToGetTgt(struct pdbg_target* target, void* userData)
+{
+    CecDevTreeHw* cecDevTreeHw = static_cast<CecDevTreeHw*>(userData);
+
+    /**
+     * The use case is, find the target from the cec device tree based on the
+     * given attribute value. So, don't use "DT_GET_PROP" to read attribute
+     * because it will add trace if the given attribute is not found to read.
+     */
+    ATTR_PHYS_BIN_PATH_Type physBinPath;
+    if (!pdbg_target_get_attribute(
+            target, "ATTR_PHYS_BIN_PATH",
+            std::stoi(dtAttr::fapi2::ATTR_PHYS_BIN_PATH_Spec),
+            dtAttr::fapi2::ATTR_PHYS_BIN_PATH_ElementCount, physBinPath))
+    {
+        return continueTgtTraversal;
+    }
+
+    if (std::memcmp(physBinPath, cecDevTreeHw->physBinPath,
+                    sizeof(physBinPath)) != 0)
+    {
+        return continueTgtTraversal;
+    }
+
+    // Found the required cec device tree target (hardware)
+    cecDevTreeHw->reqDevTreeHw = target;
+
+    return requireIsolateHwFound;
+}
+
+std::optional<struct pdbg_target*>
+    getPhalDevTreeTgt(const DevTreePhysPath& physicalPath)
+{
+    CecDevTreeHw cecDevTreeHw;
+
+    size_t physBinPathSize = sizeof(cecDevTreeHw.physBinPath);
+    if (physBinPathSize < physicalPath.size())
+    {
+        log<level::ERR>(fmt::format("EntityPath size is mismatch. "
+                                    " Given size [{}] and Expected size [{}]",
+                                    physicalPath.size(), physBinPathSize)
+                            .c_str());
+        return std::nullopt;
+    }
+    std::copy(physicalPath.begin(), physicalPath.end(),
+              cecDevTreeHw.physBinPath);
+
+    auto ret = pdbg_target_traverse(NULL, pdbgCallbackToGetTgt, &cecDevTreeHw);
+
+    if (ret != requireIsolateHwFound)
+    {
+        std::stringstream ss;
+        std::for_each(physicalPath.begin(), physicalPath.end(),
+                      [&ss](const auto& ele) {
+                          ss << std::setw(2) << std::setfill('0') << std::hex
+                             << (int)ele << " ";
+                      });
+
+        log<level::ERR>(fmt::format("Isolated HW [{}] is "
+                                    "not found in the cec device tree",
+                                    ss.str())
+                            .c_str());
+        return std::nullopt;
+    }
+
+    return cecDevTreeHw.reqDevTreeHw;
 }
 
 namespace lookup_func
