@@ -236,6 +236,51 @@ std::pair<LocationCode, InstanceId> getFRUDetails(struct pdbg_target* fruTgt)
     return std::make_pair(LocationCode(frulocCode), instanceId);
 }
 
+InstanceId getHwInstIdFromDevTree(struct pdbg_target* devTreeTgt)
+{
+    bool isChipletUnit = false;
+
+    ATTR_CHIPLET_ID_Type chipletId;
+    if (!DT_GET_PROP(ATTR_CHIPLET_ID, devTreeTgt, chipletId))
+    {
+        if (chipletId != 0xFF)
+        {
+            isChipletUnit = true;
+        }
+    }
+
+    InstanceId instanceId;
+    // Given hardware unit is packaged inside chiplet
+    if (isChipletUnit)
+    {
+        ATTR_CHIP_UNIT_POS_Type devTreeChipUnitPos;
+        if (DT_GET_PROP(ATTR_CHIP_UNIT_POS, devTreeTgt, devTreeChipUnitPos))
+        {
+            throw std::runtime_error(
+                std::string("Failed to get ATTR_CHIP_UNIT_POS from ") +
+                pdbg_target_path(devTreeTgt));
+        }
+        instanceId = devTreeChipUnitPos;
+    }
+    else
+    {
+        // Check If MRU_ID is present. If yes, use it else use pdbg target index
+        // Example: The MRU_ID is present for nx which is not a chiplet
+        ATTR_MRU_ID_Type devTreeMruId;
+        if (!DT_GET_PROP(ATTR_MRU_ID, devTreeTgt, devTreeMruId))
+        {
+            // Last two byte (from MSB) of MRU_ID having instance number
+            instanceId = devTreeMruId & 0xFFFF;
+        }
+        else
+        {
+            instanceId = pdbg_target_index(devTreeTgt);
+        }
+    }
+
+    return instanceId;
+}
+
 namespace lookup_func
 {
 CanGetPhysPath mruId(struct pdbg_target* pdbgTgt, InstanceId instanceId,
