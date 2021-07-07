@@ -72,12 +72,14 @@ class Entry :
      *  @param[in] entryIsResolved - the status of hardware isolation.
      *  @param[in] associationDef - the association to hold other dbus
      *                              object path along with entry object.
+     *  @param[in] entityPath - the entry entity path of hardware
      */
     Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
           const EntryId entryId, const EntryRecordId entryRecordId,
           const EntrySeverity isolatedHwSeverity,
           const EntryResolved entryIsResolved,
-          const AssociationDef& associationDef);
+          const AssociationDef& associationDef,
+          const openpower_guard::EntityPath& entityPath);
 
     /**
      *  @brief Mark this object as resolved
@@ -86,6 +88,11 @@ class Entry :
      *
      */
     void delete_() override;
+
+    /**
+     * @brief Used get the entity path of isolated hardware.
+     */
+    openpower_guard::EntityPath getEntityPath() const;
 
   private:
     /** @brief The id of isolated hardware dbus entry */
@@ -96,6 +103,9 @@ class Entry :
      *  @note This record id is shared between BMC and Host applications.
      */
     EntryRecordId _entryRecordId;
+
+    /** @brief The entity path of this entry */
+    openpower_guard::EntityPath _entityPath;
 
 }; // end of Entry class
 
