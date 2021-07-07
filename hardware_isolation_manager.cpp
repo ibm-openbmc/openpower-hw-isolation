@@ -397,4 +397,49 @@ void Manager::restore()
         this->createEntryForRecord(record);
     });
 }
+
+void Manager::handleHostIsolatedHardwares()
+{
+    // Wait for some time to get the final isolated hardware record list
+    // which are updated by the host because of the atomicity on partition
+    // file (which is used to isolated hardware details) between BMC and Host.
+    sleep(5);
+
+    openpower_guard::GuardRecords records = openpower_guard::getAll();
+
+    std::for_each(records.begin(), records.end(), [this](const auto& record) {
+        // Skipping fake record (GARD_Reconfig) because, fake record is
+        // created for internal purposes to use by BMC and Hostboot.
+        if (record.errType == openpower_guard::GardType::GARD_Reconfig)
+        {
+            return;
+        }
+
+        // Make sure the isolated hardware record is resolved (recordId will
+        // get change as "0xFFFFFFFF") by host OR the record is already exist.
+        auto isolatedHwIt = std::find_if(
+            _isolatedHardwares.begin(), _isolatedHardwares.end(),
+            [&record](const auto& isolatedHw) {
+                return (
+                    (isolatedHw.second->getEntityPath() == record.targetId) &&
+                    ((record.recordId == 0xFFFFFFFF) ||
+                     (isolatedHw.second->getEntryRecId() == record.recordId)));
+            });
+
+        // If not found in the existing isolated hardware entries list then
+        // the host created a new record for isolating some hardware so
+        // add the new dbus entry for the same.
+        if (isolatedHwIt == _isolatedHardwares.end())
+        {
+            this->createEntryForRecord(record);
+        }
+        // Update Resolved property if a record is resolved otherwise skip
+        // the record since it is already exist in isolated hardware entries.
+        else if (record.recordId == 0xFFFFFFFF)
+        {
+            isolatedHwIt->second->resolved(true);
+        }
+    });
+}
+
 } // namespace hw_isolation

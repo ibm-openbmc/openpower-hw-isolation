@@ -94,6 +94,11 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      */
     void restore();
 
+    /**
+     * @brief Callback to add the dbus entry for host isolated hardwares.
+     */
+    void handleHostIsolatedHardwares();
+
   private:
     /**
      *  * @brief Attached bus connection
