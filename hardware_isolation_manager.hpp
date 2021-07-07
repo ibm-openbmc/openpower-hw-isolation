@@ -6,6 +6,7 @@
 #include "hardware_isolation_entry.hpp"
 #include "isolatable_hardwares.hpp"
 #include "openpower_guard_interface.hpp"
+#include "watch.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
@@ -42,8 +43,10 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      *
      *  @param[in] bus - Bus to attach to.
      *  @param[in] path - Path to attach at.
+     *  @param[in] eventLoop - Attached event loop on bus.
      */
-    Manager(sdbusplus::bus::bus& bus, const std::string& objPath);
+    Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
+            const sd_event* eventLoop);
 
     /**
      *  @brief Implementation for Create
@@ -119,6 +122,11 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      * @brief Used to get isolatable hardware details
      */
     isolatable_hws::IsolatableHWs _isolatableHWs;
+
+    /**
+     * @brief Watcher to add dbus entry for host isolated hardware
+     */
+    watch::inotify::Watch _guardFileWatch;
 
     /**
      * @brief Used to get EID (aka PEL ID) by using BMC log

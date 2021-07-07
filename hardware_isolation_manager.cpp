@@ -25,10 +25,17 @@ namespace fs = std::filesystem;
 constexpr auto loggingObjectPath = "/xyz/openbmc_project/logging";
 constexpr auto loggingInterface = "org.open_power.Logging.PEL";
 
-Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath) :
+Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
+                 const sd_event* eventLoop) :
     type::ServerObject<CreateInterface, DeleteAllInterface>(
         bus, objPath.c_str(), true),
-    _bus(bus), _lastEntryId(0), _isolatableHWs(bus)
+    _bus(bus), _lastEntryId(0), _isolatableHWs(bus),
+    _guardFileWatch(
+        eventLoop, IN_NONBLOCK, IN_CLOSE_WRITE, EPOLLIN,
+        openpower_guard::getGuardFilePath(),
+        std::bind(
+            std::mem_fn(&hw_isolation::Manager::handleHostIsolatedHardwares),
+            this))
 {}
 
 std::optional<uint32_t>
