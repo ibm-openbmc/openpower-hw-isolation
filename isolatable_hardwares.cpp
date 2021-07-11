@@ -35,15 +35,18 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
 
     _isolatableHWsList = {
         {dimmHwId, IsolatableHWs::HW_Details(
-                       ItIsFRU, emptyHwId, devtree::lookup_func::locationCode)},
+                       ItIsFRU, emptyHwId, devtree::lookup_func::locationCode,
+                       inv_path_lookup_func::itemObjName)},
 
-        {processorHwId, IsolatableHWs::HW_Details(ItIsFRU, emptyHwId,
-                                                  devtree::lookup_func::mruId)},
+        {processorHwId, IsolatableHWs::HW_Details(
+                            ItIsFRU, emptyHwId, devtree::lookup_func::mruId,
+                            inv_path_lookup_func::itemInstance)},
 
         {IsolatableHWs::HW_Details::HwId(
              "xyz.openbmc_project.Inventory.Item.CpuCore", "core", "core"),
          IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
-                                   devtree::lookup_func::chipUnitPos)},
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemInstance)},
     };
 }
 
@@ -381,4 +384,24 @@ std::optional<std::vector<sdbusplus::message::object_path>>
 }
 
 } // namespace isolatable_hws
+
+namespace inv_path_lookup_func
+{
+
+IsItIsoHwInvPath itemObjName(const sdbusplus::message::object_path& objPath,
+                             const std::string& instance,
+                             sdbusplus::bus::bus& bus)
+{
+    return objPath.filename().find(instance) != std::string::npos;
+}
+
+IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
+                              const std::string& instance,
+                              sdbusplus::bus::bus& bus)
+{
+    return objPath.filename() == instance;
+}
+
+} // namespace inv_path_lookup_func
+
 } // namespace hw_isolation

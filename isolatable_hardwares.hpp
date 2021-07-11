@@ -10,6 +10,44 @@
 
 namespace hw_isolation
 {
+
+/**
+ * @brief Used to add functions that will use to get to know whether the
+ *        given inventory object path is isolated hardware inventory path
+ *        (maybe its parent) or not.
+ */
+namespace inv_path_lookup_func
+{
+using IsItIsoHwInvPath = bool;
+
+/**
+ * @brief Lookup function signature
+ *
+ * @param[in] object_path - the inventory object path to check whether the
+ *                          isolated hardware inventory object path or not
+ * @param[in] string - the isolated hardware instance details
+ * @param[in] bus - the attached bus
+ *
+ * @return IsItIsoHwInvPath to indicate whether the given inventory object
+ *         path is isolated hardware inventory path (maybe its parent) or not.
+ *
+ * @note All lookup functions which are added in this namespace should
+ *       match with below signature.
+ */
+using LookupFuncForInvPath =
+    std::function<IsItIsoHwInvPath(const sdbusplus::message::object_path&,
+                                   const std::string&, sdbusplus::bus::bus&)>;
+
+IsItIsoHwInvPath itemObjName(const sdbusplus::message::object_path& objPath,
+                             const std::string& instance,
+                             sdbusplus::bus::bus& bus);
+
+IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
+                              const std::string& instance,
+                              sdbusplus::bus::bus& bus);
+
+} // namespace inv_path_lookup_func
+
 namespace isolatable_hws
 {
 
@@ -166,13 +204,16 @@ class IsolatableHWs
         bool _isItFRU;
         HwId _parentFruHwId;
         devtree::lookup_func::LookupFuncForPhysPath _physPathFuncLookUp;
+        inv_path_lookup_func::LookupFuncForInvPath _invPathFuncLookUp;
 
         HW_Details(
             bool isItFRU, const HwId& parentFruHwId,
-            devtree::lookup_func::LookupFuncForPhysPath physPathFuncLookUp) :
+            devtree::lookup_func::LookupFuncForPhysPath physPathFuncLookUp,
+            inv_path_lookup_func::LookupFuncForInvPath invPathFuncLookUp) :
             _isItFRU(isItFRU),
             _parentFruHwId(parentFruHwId),
-            _physPathFuncLookUp(physPathFuncLookUp)
+            _physPathFuncLookUp(physPathFuncLookUp),
+            _invPathFuncLookUp(invPathFuncLookUp)
         {}
     };
 
