@@ -94,6 +94,11 @@ class Entry :
      */
     openpower_guard::EntityPath getEntityPath() const;
 
+    /**
+     * @brief Used get the record id of isolated hardware.
+     */
+    EntryRecordId getEntryRecId() const;
+
   private:
     /** @brief The id of isolated hardware dbus entry */
     EntryId _entryId;

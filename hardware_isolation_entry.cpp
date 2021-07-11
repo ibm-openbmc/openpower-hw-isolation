@@ -53,6 +53,11 @@ openpower_guard::EntityPath Entry::getEntityPath() const
     return _entityPath;
 }
 
+EntryRecordId Entry::getEntryRecId() const
+{
+    return _entryRecordId;
+}
+
 namespace utils
 {
 
