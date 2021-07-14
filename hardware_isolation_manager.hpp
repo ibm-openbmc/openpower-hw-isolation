@@ -6,6 +6,7 @@
 #include "hardware_isolation_entry.hpp"
 #include "isolatable_hardwares.hpp"
 #include "openpower_guard_interface.hpp"
+#include "org/open_power/HardwareIsolation/Create/server.hpp"
 #include "watch.hpp"
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
@@ -15,6 +16,9 @@ namespace hw_isolation
 
 using CreateInterface =
     sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Create;
+using OP_CreateInterface =
+    sdbusplus::org::open_power::HardwareIsolation::server::Create;
+
 using IsolatedHardwares =
     std::map<entry::EntryId, std::unique_ptr<entry::Entry>>;
 
@@ -23,13 +27,17 @@ using DeleteAllInterface =
 
 /**
  *  @class Manager
+ *
  *  @brief Hardware isolation manager implementation
+ *
  *  @details Implemetation for below interfaces
  *           xyz.openbmc_project.HardwareIsolation.Create
  *           xyz.openbmc_project.Collection.DeleteAll
- *
+ *           org.open_power.HardwareIsolation.Create
  */
-class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
+class Manager :
+    public type::ServerObject<CreateInterface, OP_CreateInterface,
+                              DeleteAllInterface>
 {
   public:
     Manager() = delete;
@@ -101,6 +109,24 @@ class Manager : public type::ServerObject<CreateInterface, DeleteAllInterface>
      * @brief Callback to add the dbus entry for host isolated hardwares.
      */
     void handleHostIsolatedHardwares();
+
+    /**
+     * @brief Implementation for CreateWithEntityPath
+     *
+     * @param[in] entityPath - The hardware entity path which is needs
+     *                         to isolate
+     * @param[in] severity - The severity of isolating hardware.
+     * @param[in] bmcErrorLog - The BMC error log caused the isolation of
+     *                          hardware.
+     *
+     * @return path The path of created
+     *              xyz.openbmc_project.HardwareIsolation.Entry object.
+     */
+    sdbusplus::message::object_path createWithEntityPath(
+        std::vector<uint8_t> entityPath,
+        sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type
+            severity,
+        sdbusplus::message::object_path bmcErrorLog) override;
 
   private:
     /**
