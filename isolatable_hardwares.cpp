@@ -59,11 +59,14 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
              !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
              inv_path_lookup_func::itemPrettyName, "Quad")},
 
-        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
-                                         "unit", "fc"),
+        // In BMC inventory, Core and FC representing as
+        // "Inventory.Item.CpuCore" since both are core and it will model based
+        // on the system core mode.
+        {IsolatableHWs::HW_Details::HwId(
+             "xyz.openbmc_project.Inventory.Item.CpuCore", "core", "fc"),
          IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
                                    devtree::lookup_func::pdbgIndex,
-                                   inv_path_lookup_func::itemPrettyName, "")},
+                                   inv_path_lookup_func::itemInstance, "")},
 
         {IsolatableHWs::HW_Details::HwId(
              "xyz.openbmc_project.Inventory.Item.CpuCore", "core", "core"),
@@ -280,6 +283,15 @@ std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
                             isolateHardware.str)
                     .c_str());
             return std::nullopt;
+        }
+        else if (isolateHwInstanceInfo->first._name == "core")
+        {
+            // TODO Below decision need to be based on system core mode
+            //     i.e whether need to use "fc" (in big core system) or
+            //     "core" (in small core system) pdbg target class to get
+            //     the appropriate target physical path from the phal
+            //     cec device tree but, now using the "fc".
+            isolateHwInstanceInfo->first._name = "fc";
         }
 
         auto isolateHwId = IsolatableHWs::HW_Details::HwId{
@@ -685,8 +697,32 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
                 return std::nullopt;
             }
 
-            auto isolateHwInstId =
-                devtree::getHwInstIdFromDevTree(*isolatedHwTgt);
+            InstanceId isolateHwInstId;
+            // TODO Below decision need to be based on system core mode
+            //     i.e whether need to use "fc" (in big core system) or
+            //     "core" (in small core system) pdbg target class to get
+            //     the appropriate target physical path from the phal
+            //     cec device tree but, now using the "fc".
+            if (isolatedHwPdbgClass == "core")
+            {
+                struct pdbg_target* parentFc =
+                    pdbg_target_parent("fc", *isolatedHwTgt);
+                if (parentFc == nullptr)
+                {
+                    log<level::ERR>(
+                        fmt::format("Failed to get the parent FC target for "
+                                    "the given device tree target path [{}]",
+                                    isolatedHwTgtDevTreePath)
+                            .c_str());
+                    return std::nullopt;
+                }
+                isolateHwInstId = devtree::getHwInstIdFromDevTree(parentFc);
+            }
+            else
+            {
+                isolateHwInstId =
+                    devtree::getHwInstIdFromDevTree(*isolatedHwTgt);
+            }
 
             /**
              * If PrettyName is not empty then use that as instance name
