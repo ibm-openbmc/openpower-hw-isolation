@@ -382,6 +382,12 @@ CanGetPhysPath locationCode(struct pdbg_target* pdbgTgt, InstanceId instanceId,
     return canGetPhysPath;
 }
 
+CanGetPhysPath pdbgIndex(struct pdbg_target* pdbgTgt, InstanceId instanceId,
+                         LocationCode locCode)
+{
+    return pdbg_target_index(pdbgTgt) == instanceId;
+}
+
 } // namespace lookup_func
 
 } // namespace devtree

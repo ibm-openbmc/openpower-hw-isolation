@@ -137,6 +137,9 @@ CanGetPhysPath chipUnitPos(struct pdbg_target* pdbgTgt, InstanceId instanceId,
 CanGetPhysPath locationCode(struct pdbg_target* pdbgTgt, InstanceId instanceId,
                             LocationCode locCode);
 
+CanGetPhysPath pdbgIndex(struct pdbg_target* pdbgTgt, InstanceId instanceId,
+                         LocationCode locCode);
+
 } // namespace lookup_func
 } // namespace  devtree
 } // namespace hw_isolation

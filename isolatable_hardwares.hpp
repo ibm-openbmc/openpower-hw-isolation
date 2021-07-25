@@ -46,6 +46,10 @@ IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
                               const std::string& instance,
                               sdbusplus::bus::bus& bus);
 
+IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
+                                const std::string& instance,
+                                sdbusplus::bus::bus& bus);
+
 } // namespace inv_path_lookup_func
 
 namespace isolatable_hws
@@ -205,15 +209,17 @@ class IsolatableHWs
         HwId _parentFruHwId;
         devtree::lookup_func::LookupFuncForPhysPath _physPathFuncLookUp;
         inv_path_lookup_func::LookupFuncForInvPath _invPathFuncLookUp;
+        std::string _prettyName;
 
         HW_Details(
             bool isItFRU, const HwId& parentFruHwId,
             devtree::lookup_func::LookupFuncForPhysPath physPathFuncLookUp,
-            inv_path_lookup_func::LookupFuncForInvPath invPathFuncLookUp) :
+            inv_path_lookup_func::LookupFuncForInvPath invPathFuncLookUp,
+            const std::string& prettyName) :
             _isItFRU(isItFRU),
             _parentFruHwId(parentFruHwId),
             _physPathFuncLookUp(physPathFuncLookUp),
-            _invPathFuncLookUp(invPathFuncLookUp)
+            _invPathFuncLookUp(invPathFuncLookUp), _prettyName(prettyName)
         {}
     };
 

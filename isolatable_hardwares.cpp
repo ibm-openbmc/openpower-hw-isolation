@@ -10,10 +10,10 @@
 
 namespace hw_isolation
 {
+using namespace phosphor::logging;
+
 namespace isolatable_hws
 {
-
-using namespace phosphor::logging;
 
 IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
 {
@@ -34,19 +34,141 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
     bool ItIsFRU = true;
 
     _isolatableHWsList = {
-        {dimmHwId, IsolatableHWs::HW_Details(
-                       ItIsFRU, emptyHwId, devtree::lookup_func::locationCode,
-                       inv_path_lookup_func::itemObjName)},
+        // FRU (Field Replaceable Unit) which are present in
+        // OpenPOWER based system
 
         {processorHwId, IsolatableHWs::HW_Details(
                             ItIsFRU, emptyHwId, devtree::lookup_func::mruId,
-                            inv_path_lookup_func::itemInstance)},
+                            inv_path_lookup_func::itemInstance, "")},
+
+        {dimmHwId, IsolatableHWs::HW_Details(
+                       ItIsFRU, emptyHwId, devtree::lookup_func::locationCode,
+                       inv_path_lookup_func::itemObjName, "")},
+
+        {IsolatableHWs::HW_Details::HwId(
+             "xyz.openbmc_project.Inventory.Item.Tpm", "tpm", "tpm"),
+         IsolatableHWs::HW_Details(ItIsFRU, emptyHwId,
+                                   devtree::lookup_func::locationCode,
+                                   inv_path_lookup_func::itemObjName, "")},
+
+        // Processor Subunits
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "eq"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "Quad")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "fc"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::pdbgIndex,
+                                   inv_path_lookup_func::itemPrettyName, "")},
 
         {IsolatableHWs::HW_Details::HwId(
              "xyz.openbmc_project.Inventory.Item.CpuCore", "core", "core"),
          IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
                                    devtree::lookup_func::chipUnitPos,
-                                   inv_path_lookup_func::itemInstance)},
+                                   inv_path_lookup_func::itemInstance, "")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "mc"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "Memory Controller")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "mi"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Processor To Memory Buffer Interface")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "mcc"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Memory Controller Channel")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "omi"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "OpenCAPI Memory Interface")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "pauc"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "POWER Accelerator Unit Controller")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "pau"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "POWER Accelerator Unit")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "omic"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "OpenCAPI Memory Interface Controller")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "iohs"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "High speed SMP/OpenCAPI Link")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "smpgroup"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "OBUS End Point")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "pec"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "PCI Express controllers")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "phb"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "PCIe host bridge (PHB)")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "nmmu"),
+         IsolatableHWs::HW_Details(!ItIsFRU, processorHwId,
+                                   devtree::lookup_func::chipUnitPos,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Nest Memory Management Unit")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "nx"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::mruId,
+             inv_path_lookup_func::itemPrettyName, "Accelerator")},
+
+        // Memory (aka DIMM) subunits
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "ocmb"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, dimmHwId, devtree::lookup_func::pdbgIndex,
+             inv_path_lookup_func::itemPrettyName, "OpenCAPI Memory Buffer")},
+
+        {IsolatableHWs::HW_Details::HwId("xyz.openbmc_project.Inventory.Item",
+                                         "unit", "mem_port"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, dimmHwId, devtree::lookup_func::pdbgIndex,
+             inv_path_lookup_func::itemPrettyName, "DDR Memory Port")},
     };
 }
 
@@ -88,7 +210,6 @@ std::optional<
     IsolatableHWs::getIsotableHWDetails(
         const IsolatableHWs::HW_Details::HwId& id) const
 {
-
     auto it = std::find_if(
         _isolatableHWsList.begin(), _isolatableHWsList.end(),
         [&id](const auto& isolatableHw) { return isolatableHw.first == id; });
@@ -148,6 +269,16 @@ std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
             getInstanceInfo(isolateHardware.filename());
         if (!isolateHwInstanceInfo.has_value())
         {
+            return std::nullopt;
+        }
+
+        if (isolateHwInstanceInfo->first._name == "unit")
+        {
+            log<level::ERR>(
+                fmt::format("Not allowed to isolate the given hardware [{}] "
+                            "which is not modeled in BMC inventory",
+                            isolateHardware.str)
+                    .c_str());
             return std::nullopt;
         }
 
@@ -328,23 +459,65 @@ std::optional<std::vector<sdbusplus::message::object_path>>
 std::optional<struct pdbg_target*>
     IsolatableHWs::getParentFruPhalDevTreeTgt(struct pdbg_target* devTreeTgt)
 {
-    /**
-     * FIXME: Today, All FRU parts (units - both(chiplet and non-chiplet))
-     *        are modelled under the respective processor in cec device
-     *        tree so, if something changed then, need to revisit the
-     *        logic which is used to get the FRU details of FRU unit.
-     */
-    struct pdbg_target* parentFruTarget =
-        pdbg_target_parent("proc", devTreeTgt);
-    std::string fruUnitDevTreePath = pdbg_target_path(devTreeTgt);
-    if (parentFruTarget == nullptr)
+    std::string fruUnitDevTreePath{pdbg_target_path(devTreeTgt)};
+    std::string fruUnitPdbgClass{pdbg_target_class_name(devTreeTgt)};
+
+    struct pdbg_target* parentFruTarget = nullptr;
+    if ((fruUnitPdbgClass == "ocmb") || (fruUnitPdbgClass == "mem_port"))
     {
-        log<level::ERR>(
-            fmt::format("Failed to get the processor target from phal cec "
-                        "device tree for the given target [{}]",
-                        fruUnitDevTreePath)
-                .c_str());
-        return std::nullopt;
+        /**
+         * FIXME: The assumption is, dimm is parent fru for "ocmb" and
+         *        "mem_port" and each "ocmb" or "mem_port" will have one
+         *        "dimm" so if something is changed then need to fix
+         *        this logic.
+         * @note  In phal cec device tree dimm is placed under ocmb->mem_port
+         *        based on dimm pervasive path.
+         */
+        auto dimmCount = 0;
+        pdbg_for_each_target("dimm", devTreeTgt, parentFruTarget)
+        {
+            ++dimmCount;
+        }
+
+        if (dimmCount == 0)
+        {
+            log<level::ERR>(
+                fmt::format("Failed to get the parent dimm target "
+                            "from phal cec device tree for the given phal cec "
+                            "device tree target [{}]",
+                            fruUnitDevTreePath)
+                    .c_str());
+            return std::nullopt;
+        }
+        else if (dimmCount > 1)
+        {
+            log<level::ERR>(
+                fmt::format("More [{}] dimm targets are present "
+                            "in phal cec device tree for the given phal cec "
+                            " device tree target [{}]",
+                            dimmCount, fruUnitDevTreePath)
+                    .c_str());
+            return std::nullopt;
+        }
+    }
+    else
+    {
+        /**
+         * FIXME: Today, All FRU parts (units - both(chiplet and non-chiplet))
+         *        are modelled under the respective processor in cec device
+         *        tree so, if something changed then, need to revisit the
+         *        logic which is used to get the FRU details of FRU unit.
+         */
+        parentFruTarget = pdbg_target_parent("proc", devTreeTgt);
+        if (parentFruTarget == nullptr)
+        {
+            log<level::ERR>(
+                fmt::format("Failed to get the processor target from phal cec "
+                            "device tree for the given target [{}]",
+                            fruUnitDevTreePath)
+                    .c_str());
+            return std::nullopt;
+        }
     }
     return parentFruTarget;
 }
@@ -515,10 +688,24 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
             auto isolateHwInstId =
                 devtree::getHwInstIdFromDevTree(*isolatedHwTgt);
 
-            auto isolateHw = isolatedHwDetails->first._itemObjectName._name +
-                             (isolateHwInstId == 0xFFFFFFFF
-                                  ? ""
-                                  : std::to_string(isolateHwInstId));
+            /**
+             * If PrettyName is not empty then use that as instance name
+             * because currently few isolatbale hardware subunits is not
+             * modelled in BMC Inventory and Redfish so these subunits
+             * need to look based on PrettyName to get inventory path.
+             */
+            std::string isolateHw;
+            if (isolatedHwDetails->second._prettyName.empty())
+            {
+                isolateHw = isolatedHwDetails->first._itemObjectName._name +
+                            (isolateHwInstId == 0xFFFFFFFF
+                                 ? ""
+                                 : std::to_string(isolateHwInstId));
+            }
+            else
+            {
+                isolateHw = isolatedHwDetails->second._prettyName;
+            }
 
             auto isolateHwPath = std::find_if(
                 childsInventoryPath->begin(), childsInventoryPath->end(),
@@ -564,6 +751,26 @@ IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
                               sdbusplus::bus::bus& bus)
 {
     return objPath.filename() == instance;
+}
+
+IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
+                                const std::string& instance,
+                                sdbusplus::bus::bus& bus)
+{
+    try
+    {
+        auto prettyName = utils::getDBusPropertyVal<std::string>(
+            bus, objPath, "xyz.openbmc_project.Inventory.Item", "PrettyName");
+        return prettyName == instance;
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::WARNING>(fmt::format("Exception [{}] to get PrettyName for "
+                                        "the given object path [{}]",
+                                        e.what(), objPath.str)
+                                .c_str());
+        return false;
+    }
 }
 
 } // namespace inv_path_lookup_func
