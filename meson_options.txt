@@ -12,7 +12,7 @@ option('HW_ISOLATION_OBJPATH', type: 'string',
       )
 
 option('PHAL_DEVTREE', type: 'string',
-        value : '/var/lib/phosphor-software-manager/pnor/rw/DEVTREE',
+        value : '/var/lib/phosphor-software-manager/hostfw/running/GUARD',
         description : 'The PHAL CEC device tree to get hardware details'
       )
 
