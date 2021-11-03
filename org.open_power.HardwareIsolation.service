@@ -4,6 +4,7 @@ Wants=mapper-wait@-xyz-openbmc_project-inventory.service
 After=mapper-wait@-xyz-openbmc_project-inventory.service
 Wants=pldmd.service
 After=pldmd.service
+After=openpower-update-bios-attr-table.service
 
 [Service]
 ExecStart=/usr/bin/env openpower-hw-isolation
