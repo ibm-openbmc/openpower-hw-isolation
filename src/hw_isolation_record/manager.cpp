@@ -24,9 +24,6 @@ namespace record
 using namespace phosphor::logging;
 namespace fs = std::filesystem;
 
-constexpr auto loggingObjectPath = "/xyz/openbmc_project/logging";
-constexpr auto loggingInterface = "org.open_power.Logging.PEL";
-
 Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
                  const sd_event* eventLoop) :
     type::ServerObject<CreateInterface, OP_CreateInterface, DeleteAllInterface>(
@@ -49,11 +46,11 @@ std::optional<uint32_t>
         uint32_t eid;
 
         auto dbusServiceName = utils::getDBusServiceName(
-            _bus, loggingObjectPath, loggingInterface);
+            _bus, type::LoggingObjectPath, type::LoggingInterface);
 
-        auto method =
-            _bus.new_method_call(dbusServiceName.c_str(), loggingObjectPath,
-                                 loggingInterface, "GetPELIdFromBMCLogId");
+        auto method = _bus.new_method_call(
+            dbusServiceName.c_str(), type::LoggingObjectPath,
+            type::LoggingInterface, "GetPELIdFromBMCLogId");
 
         method.append(static_cast<uint32_t>(std::stoi(bmcErrorLog.filename())));
         auto resp = _bus.call(method);
@@ -276,45 +273,6 @@ void Manager::deleteAll()
     }
 }
 
-std::optional<sdbusplus::message::object_path>
-    Manager::getBMCLogPath(const uint32_t eid) const
-{
-    // If EID is "0" means doesn't have associated error log in
-    // isolated hardware
-    if (eid == 0)
-    {
-        return sdbusplus::message::object_path();
-    }
-
-    try
-    {
-        auto dbusServiceName = utils::getDBusServiceName(
-            _bus, loggingObjectPath, loggingInterface);
-
-        auto method =
-            _bus.new_method_call(dbusServiceName.c_str(), loggingObjectPath,
-                                 loggingInterface, "GetBMCLogIdFromPELId");
-
-        method.append(static_cast<uint32_t>(eid));
-        auto resp = _bus.call(method);
-
-        uint32_t bmcLogId;
-        resp.read(bmcLogId);
-
-        return sdbusplus::message::object_path(std::string(loggingObjectPath) +
-                                               "/entry/" +
-                                               std::to_string(bmcLogId));
-    }
-    catch (const sdbusplus::exception::SdBusError& e)
-    {
-        log<level::ERR>(fmt::format("Failed to get BMC log id "
-                                    "for the given EID (aka PEL ID) [{}]",
-                                    eid)
-                            .c_str());
-        return std::nullopt;
-    }
-}
-
 void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
 {
     auto entityPathRawData =
@@ -348,7 +306,7 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
             return;
         }
 
-        auto bmcErrorLogPath = getBMCLogPath(record.elogId);
+        auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
 
         if (!bmcErrorLogPath.has_value())
         {

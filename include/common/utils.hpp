@@ -177,5 +177,17 @@ bool isHwIosolationSettingEnabled(sdbusplus::bus::bus& bus);
 void setEnabledProperty(sdbusplus::bus::bus& bus,
                         const std::string& dbusObjPath, bool enabledPropVal);
 
+/**
+ * @brief Used to get BMC log object path by using EID (aka PEL ID)
+ *
+ * @param[in] bus - Bus to attach to.
+ * @param[in] eid - The EID (aka PEL ID) to get BMC log object path
+ *
+ * @return The BMC log object path
+ *         Empty optional on failure
+ */
+std::optional<sdbusplus::message::object_path>
+    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid);
+
 } // namespace utils
 } // namespace hw_isolation

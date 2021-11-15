@@ -163,5 +163,43 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
     }
 }
 
+std::optional<sdbusplus::message::object_path>
+    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid)
+{
+    // If EID is "0" means, no bmc error log.
+    if (eid == 0)
+    {
+        return sdbusplus::message::object_path();
+    }
+
+    try
+    {
+        auto dbusServiceName = utils::getDBusServiceName(
+            bus, type::LoggingObjectPath, type::LoggingInterface);
+
+        auto method = bus.new_method_call(
+            dbusServiceName.c_str(), type::LoggingObjectPath,
+            type::LoggingInterface, "GetBMCLogIdFromPELId");
+
+        method.append(static_cast<uint32_t>(eid));
+        auto resp = bus.call(method);
+
+        uint32_t bmcLogId;
+        resp.read(bmcLogId);
+
+        return sdbusplus::message::object_path(
+            std::string(type::LoggingObjectPath) + "/entry/" +
+            std::to_string(bmcLogId));
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::ERR>(fmt::format("Failed to get BMC log id "
+                                    "for the given EID (aka PEL ID) [{}]",
+                                    eid)
+                            .c_str());
+        return std::nullopt;
+    }
+}
+
 } // namespace utils
 } // namespace hw_isolation

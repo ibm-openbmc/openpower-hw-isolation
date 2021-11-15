@@ -203,17 +203,6 @@ class Manager :
     void isHwIsolationAllowed(const entry::EntrySeverity& severity);
 
     /**
-     * @brief Used to get BMC log object path by using EID (aka PEL ID)
-     *
-     * @param[in] eid - The EID (aka PEL ID) to get BMC log object path
-     *
-     * @return The BMC log object path
-     *         Empty optional on failure
-     */
-    std::optional<sdbusplus::message::object_path>
-        getBMCLogPath(const uint32_t eid) const;
-
-    /**
      * @brief Create dbus entry object for isolated hardware record
      *
      * @param[in] record - The isolated hardware record

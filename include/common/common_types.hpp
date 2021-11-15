@@ -29,5 +29,8 @@ namespace CommonError = sdbusplus::xyz::openbmc_project::Common::Error;
 constexpr auto ObjectMapperName = "xyz.openbmc_project.ObjectMapper";
 constexpr auto ObjectMapperPath = "/xyz/openbmc_project/object_mapper";
 
+constexpr auto LoggingObjectPath = "/xyz/openbmc_project/logging";
+constexpr auto LoggingInterface = "org.open_power.Logging.PEL";
+
 } // namespace type
 } // namespace hw_isolation
