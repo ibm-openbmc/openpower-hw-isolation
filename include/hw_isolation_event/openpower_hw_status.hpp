@@ -87,6 +87,19 @@ enum DeconfiguredByReason
     DECONFIGURED_BY_PLID_MASK = 0xFFFF0000,
 };
 
+/**
+ * @brief Used to get the event message and seveity for the given
+ *        DeconfiguredByReason
+ *
+ * @paran[in] reason - the deconfigured reason
+ *
+ * @return the pair<EventMsg, EventSeverity> for the given
+ *         DeconfiguredByReason on success
+ *         the pair<"Unknown", Warning> on failure
+ */
+std::pair<event::EventMsg, event::EventSeverity>
+    convertDeconfiguredByReasonFromEnum(const DeconfiguredByReason& reason);
+
 } // namespace openpower_hw_status
 } // namespace event
 } // namespace hw_isolation

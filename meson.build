@@ -53,6 +53,7 @@ hardware_isolation_sources = [
         'src/common/watch.cpp',
         'src/hw_isolation_event/event.cpp',
         'src/hw_isolation_event/hw_status_manager.cpp',
+        'src/hw_isolation_event/openpower_hw_status.cpp',
         'src/hw_isolation_record/entry.cpp',
         'src/hw_isolation_record/manager.cpp',
         'src/hw_isolation_record/openpower_guard_interface.cpp'
