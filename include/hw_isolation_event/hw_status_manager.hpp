@@ -85,6 +85,13 @@ class Manager
     std::vector<std::string> _requiredHwsPdbgClass;
 
     /**
+     * @brief The list of D-Bus match objects to process
+     *        the interested D-Bus signal if catched.
+     */
+    std::vector<std::unique_ptr<sdbusplus::bus::match::match>>
+        _dbusSignalWatcher;
+
+    /**
      * @brief Create the hardware status event dbus object
      *
      * @param[in] eventSeverity - the severity of the event.
@@ -117,6 +124,24 @@ class Manager
      */
     std::pair<event::EventMsg, event::EventSeverity> getIsolatedHwStatusInfo(
         const record::entry::EntrySeverity& recSeverity);
+
+    /**
+     * @brief Used to take appropriate action when the HostState changed
+     *
+     * @param[in] message - The D-Bus signal message
+     *
+     * @return NULL
+     */
+    void onHostStateChange(sdbusplus::message::message& message);
+
+    /**
+     * @brief Used to take appropriate action when the BootProgress changed
+     *
+     * @param[in] message - The D-Bus signal message
+     *
+     * @return NULL
+     */
+    void onBootProgressChange(sdbusplus::message::message& message);
 };
 
 } // namespace hw_status

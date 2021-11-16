@@ -25,6 +25,14 @@ namespace event
 {
 namespace hw_status
 {
+namespace dbus_type
+{
+using Interface = std::string;
+using Property = std::string;
+using PropertyValue = std::variant<std::string>;
+using Properties = std::map<Property, PropertyValue>;
+using Interfaces = std::map<Interface, Properties>;
+} // namespace dbus_type
 
 using namespace phosphor::logging;
 namespace fs = std::filesystem;
@@ -38,7 +46,40 @@ Manager::Manager(sdbusplus::bus::bus& bus,
     _lastEventId(0), _isolatableHWs(bus),
     _hwIsolationRecordMgr(hwIsolationRecordMgr),
     _requiredHwsPdbgClass({"dimm", "fc"})
-{}
+{
+    // Adding the required D-Bus match rules to create hardware status event
+    // if interested signal is occurred.
+    try
+    {
+        constexpr auto HOST_STATE_OBJ_PATH = "/xyz/openbmc_project/state/host0";
+        namespace sdbusplus_match = sdbusplus::bus::match;
+
+        // Watch xyz.openbmc_project.State.Host::CurrentHostState property
+        // change to take appropriate action for the hardware status event
+        _dbusSignalWatcher.push_back(std::make_unique<sdbusplus_match::match>(
+            _bus,
+            sdbusplus_match::rules::propertiesChanged(
+                HOST_STATE_OBJ_PATH, "xyz.openbmc_project.State.Host"),
+            std::bind(std::mem_fn(&Manager::onHostStateChange), this,
+                      std::placeholders::_1)));
+
+        // Watch xyz.openbmc_project.State.Boot.Progress::BootProgress property
+        // change to take appropriate action for the hardware status event
+        _dbusSignalWatcher.push_back(std::make_unique<sdbusplus_match::match>(
+            _bus,
+            sdbusplus_match::rules::propertiesChanged(
+                HOST_STATE_OBJ_PATH, "xyz.openbmc_project.State.Boot.Progress"),
+            std::bind(std::mem_fn(&Manager::onBootProgressChange), this,
+                      std::placeholders::_1)));
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] while adding the D-Bus match rules",
+                        e.what())
+                .c_str());
+    }
+}
 
 std::optional<sdbusplus::message::object_path> Manager::createEvent(
     const EventSeverity& eventSeverity, const EventMsg& eventMsg,
@@ -308,6 +349,100 @@ void Manager::restoreHardwaresStatusEvent()
                 }
             }
         });
+}
+
+void Manager::onHostStateChange(sdbusplus::message::message& message)
+{
+    dbus_type::Interface interface;
+    dbus_type::Properties properties;
+
+    try
+    {
+        message.read(interface, properties);
+
+        for (const auto& property : properties)
+        {
+            if (property.first == "CurrentHostState")
+            {
+                if (const auto* propVal =
+                        std::get_if<std::string>(&property.second))
+                {
+                    if (*propVal ==
+                        "xyz.openbmc_project.State.Host.HostState.Quiesced")
+                    {
+                        restoreHardwaresStatusEvent();
+                    }
+                }
+                else
+                {
+                    log<level::ERR>(
+                        fmt::format("D-Bus Message signature [{}] "
+                                    "Failed to read the CurrentHostState "
+                                    "property value while changed",
+                                    message.get_signature())
+                            .c_str());
+                }
+                // No need to look other properties
+                break;
+            }
+        }
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] and D-Bus Message signature [{}] "
+                        "so failed to get the CurrentHostState property value "
+                        "while changed",
+                        e.what(), message.get_signature())
+                .c_str());
+    }
+}
+
+void Manager::onBootProgressChange(sdbusplus::message::message& message)
+{
+    dbus_type::Interface interface;
+    dbus_type::Properties properties;
+
+    try
+    {
+        message.read(interface, properties);
+
+        for (const auto& property : properties)
+        {
+            if (property.first == "BootProgress")
+            {
+                if (const auto* propVal =
+                        std::get_if<std::string>(&property.second))
+                {
+                    if (*propVal == "xyz.openbmc_project.State.Boot.Progress."
+                                    "ProgressStages.SystemInitComplete")
+                    {
+                        restoreHardwaresStatusEvent();
+                    }
+                }
+                else
+                {
+                    log<level::ERR>(
+                        fmt::format("D-Bus Message signature [{}] "
+                                    "Failed to read the BootProgress"
+                                    "property value while changed",
+                                    message.get_signature())
+                            .c_str());
+                }
+                // No need to look other properties
+                break;
+            }
+        }
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] and D-Bus Message signature [{}] "
+                        "so failed to get the BootProgress property value "
+                        "while changed",
+                        e.what(), message.get_signature())
+                .c_str());
+    }
 }
 
 } // namespace hw_status
