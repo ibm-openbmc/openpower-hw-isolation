@@ -3,6 +3,7 @@
 #pragma once
 
 #include "hw_isolation_event/event.hpp"
+#include "hw_isolation_record/entry.hpp"
 
 #include <sdbusplus/bus.hpp>
 
@@ -74,6 +75,18 @@ class Manager
      * @return NULL
      */
     void clearHardwaresStatusEvent();
+
+    /**
+     * @brief Used to get the isolated hardware record status
+     *
+     * @param[in] recSeverity - the severity of the isolated hardware record
+     *
+     * @return the pair<EventMsg, EventSeverity> of the isolated hardware
+     *         record on success
+     *         the pair<"Unknown", Warning> on failure
+     */
+    std::pair<event::EventMsg, event::EventSeverity> getIsolatedHwStatusInfo(
+        const record::entry::EntrySeverity& recSeverity);
 };
 
 } // namespace hw_status

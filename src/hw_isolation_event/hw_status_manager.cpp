@@ -84,6 +84,28 @@ void Manager::clearHardwaresStatusEvent()
     _lastEventId = 0;
 }
 
+std::pair<event::EventMsg, event::EventSeverity>
+    Manager::getIsolatedHwStatusInfo(
+        const record::entry::EntrySeverity& recSeverity)
+{
+    switch (recSeverity)
+    {
+        case record::entry::EntrySeverity::Critical:
+            return std::make_pair("Fatal", event::EventSeverity::Critical);
+        case record::entry::EntrySeverity::Warning:
+            return std::make_pair("Predictive", event::EventSeverity::Warning);
+        case record::entry::EntrySeverity::Manual:
+            return std::make_pair("Manual", event::EventSeverity::Ok);
+        default:
+            log<level::ERR>(
+                fmt::format("Unsupported hardware isolation entry [{}]",
+                            record::entry::EntryInterface::convertTypeToString(
+                                recSeverity))
+                    .c_str());
+            return std::make_pair("Unknown", event::EventSeverity::Warning);
+    }
+}
+
 } // namespace hw_status
 } // namespace event
 } // namespace hw_isolation
