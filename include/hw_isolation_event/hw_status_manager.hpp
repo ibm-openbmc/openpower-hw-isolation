@@ -67,6 +67,13 @@ class Manager
     std::optional<sdbusplus::message::object_path> createEvent(
         const EventSeverity& eventSeverity, const EventMsg& eventMsg,
         const std::string& hwInventoryPath, const std::string& bmcErrorLogPath);
+
+    /**
+     * @brief Used to clear the old hardwares status event
+     *
+     * @return NULL
+     */
+    void clearHardwaresStatusEvent();
 };
 
 } // namespace hw_status

@@ -76,6 +76,14 @@ std::optional<sdbusplus::message::object_path> Manager::createEvent(
     return std::nullopt;
 }
 
+void Manager::clearHardwaresStatusEvent()
+{
+    // Remove all the existing hardware status event and
+    // reset the last event id as "0"
+    _hwStatusEvents.clear();
+    _lastEventId = 0;
+}
+
 } // namespace hw_status
 } // namespace event
 } // namespace hw_isolation
