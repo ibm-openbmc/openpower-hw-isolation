@@ -2,8 +2,10 @@
 
 #pragma once
 
+#include "common/isolatable_hardwares.hpp"
 #include "hw_isolation_event/event.hpp"
 #include "hw_isolation_record/entry.hpp"
+#include "hw_isolation_record/manager.hpp"
 
 #include <sdbusplus/bus.hpp>
 
@@ -35,8 +37,20 @@ class Manager
     /** @brief Constructor to put object onto bus at a dbus path.
      *
      *  @param[in] bus - Bus to attach to.
+     *  @param[in] hwIsolationRecordMgr - the hardware isolation record manager
      */
-    Manager(sdbusplus::bus::bus& bus);
+    Manager(sdbusplus::bus::bus& bus, record::Manager& hwIsolationRecordMgr);
+
+    /**
+     * @brief Used to create hardware status event for all hardware.
+     *
+     * @return NULL
+     *
+     * @note This function will skip to create
+     *       the hardware status event if any failures while
+     *       processing all hardware.
+     */
+    void restoreHardwaresStatusEvent();
 
   private:
     /**
@@ -53,6 +67,22 @@ class Manager
      * @brief Hardware status event list
      */
     HwStatusEvents _hwStatusEvents;
+
+    /**
+     * @brief Used to get isolatable hardware details
+     */
+    isolatable_hws::IsolatableHWs _isolatableHWs;
+
+    /**
+     * @brief Used to get the hardware isolation record details
+     */
+    record::Manager& _hwIsolationRecordMgr;
+
+    /**
+     * @brief List of pdbg target (aka hardware) class to create
+     *        the hardware status event.
+     */
+    std::vector<std::string> _requiredHwsPdbgClass;
 
     /**
      * @brief Create the hardware status event dbus object
