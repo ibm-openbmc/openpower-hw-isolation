@@ -130,6 +130,22 @@ class Manager :
             severity,
         sdbusplus::message::object_path bmcErrorLog) override;
 
+    /**
+     * @brief Used to the isolated hardware entry information.
+     *
+     * @param[in] hwInventoryPath - the hardware inventory path to get
+     *                              the entry information.
+     *
+     * @return tuple with EntrySeverity, EntryErrLogPath on success
+     *         Empty optional if the hardware is not isolated
+     *
+     * @note The EntryErrLogPath will be empty if the respective entry
+     *       does not have bmc error log path.
+     */
+    std::optional<std::tuple<entry::EntrySeverity, entry::EntryErrLogPath>>
+        getIsolatedHwRecordInfo(
+            const sdbusplus::message::object_path& hwInventoryPath);
+
   private:
     /**
      *  * @brief Attached bus connection

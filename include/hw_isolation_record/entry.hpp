@@ -35,6 +35,8 @@ using EpochTime = sdbusplus::xyz::openbmc_project::Time::server::EpochTime;
 
 using DeleteInterface = sdbusplus::xyz::openbmc_project::Object::server::Delete;
 
+using EntryErrLogPath = std::string;
+
 /**
  * @class Entry
  *
