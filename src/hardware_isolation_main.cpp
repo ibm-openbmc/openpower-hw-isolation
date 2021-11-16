@@ -3,6 +3,7 @@
 #include "config.h"
 
 #include "common/utils.hpp"
+#include "hw_isolation_event/hw_status_manager.hpp"
 #include "hw_isolation_record/manager.hpp"
 
 #include <fmt/format.h>
@@ -33,6 +34,11 @@ int main()
 
         // Restore the isolated hardwares from their persisted location.
         record_mgr.restore();
+
+        hw_isolation::event::hw_status::Manager hwStatusMgr(bus, record_mgr);
+
+        // Restore the hardware status event from their persisted location.
+        hwStatusMgr.restoreHardwaresStatusEvent();
 
         // The below statement should be last to enter this app into the loop
         // to process D-Bus services.
