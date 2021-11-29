@@ -491,24 +491,19 @@ std::optional<std::tuple<entry::EntrySeverity, entry::EntryErrLogPath>>
     auto entryIt =
         std::find_if(_isolatedHardwares.begin(), _isolatedHardwares.end(),
                      [hwInventoryPath](const auto& ele) {
-                         bool isIsolated = false;
                          for (const auto& assocEle : ele.second->associations())
                          {
                              if ((std::get<0>(assocEle) == "isolated_hw") &&
                                  (std::get<2>(assocEle) == hwInventoryPath.str))
                              {
-                                 isIsolated = true;
-                                 break;
+                                 // Make sure whether the given hardware
+                                 // inventory is not resolved because the same
+                                 // hardware might be isolated and resolved many
+                                 // times.
+                                 return !ele.second->resolved();
                              }
                          }
 
-                         // Make sure whether the given hardware inventory is
-                         // not resolved because the same hardware might be
-                         // isolated and resolved many times.
-                         if (isIsolated)
-                         {
-                             return !ele.second->resolved();
-                         }
                          return false;
                      });
 
