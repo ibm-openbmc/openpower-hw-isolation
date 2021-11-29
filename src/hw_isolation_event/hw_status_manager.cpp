@@ -36,10 +36,9 @@ Manager::Manager(sdbusplus::bus::bus& bus,
                  record::Manager& hwIsolationRecordMgr) :
     _bus(bus),
     _lastEventId(0), _isolatableHWs(bus),
-    _hwIsolationRecordMgr(hwIsolationRecordMgr)
-{
-    _requiredHwsPdbgClass = {"dimm", "fc"};
-}
+    _hwIsolationRecordMgr(hwIsolationRecordMgr),
+    _requiredHwsPdbgClass({"dimm", "fc"})
+{}
 
 std::optional<sdbusplus::message::object_path> Manager::createEvent(
     const EventSeverity& eventSeverity, const EventMsg& eventMsg,
@@ -145,6 +144,8 @@ void Manager::restoreHardwaresStatusEvent()
                                         "ATTR_HWAS_STATE from [{}]",
                                         pdbg_target_path(tgt))
                                 .c_str());
+                        commit<type::CommonError::InternalFailure>(
+                            type::ErrorLogLevel::Informational);
                         continue;
                     }
 
@@ -160,6 +161,8 @@ void Manager::restoreHardwaresStatusEvent()
                                     "ATTR_PHYS_BIN_PATH from [{}]",
                                     pdbg_target_path(tgt))
                                     .c_str());
+                            commit<type::CommonError::InternalFailure>(
+                                type::ErrorLogLevel::Informational);
                             continue;
                         }
 
@@ -181,6 +184,8 @@ void Manager::restoreHardwaresStatusEvent()
                                     "hardware [{}]",
                                     pdbg_target_path(tgt))
                                     .c_str());
+                            commit<type::CommonError::InternalFailure>(
+                                type::ErrorLogLevel::Informational);
                             continue;
                         }
 
@@ -206,9 +211,7 @@ void Manager::restoreHardwaresStatusEvent()
 
                             // Error log might be present or not in the record.
                             eventErrLogPath =
-                                (std::get<1>(*isolatedhwRecordInfo).empty()
-                                     ? ""
-                                     : std::get<1>(*isolatedhwRecordInfo));
+                                std::get<1>(*isolatedhwRecordInfo);
 
                             auto hwStatusInfo = getIsolatedHwStatusInfo(
                                 std::get<0>(*isolatedhwRecordInfo));
@@ -249,6 +252,8 @@ void Manager::restoreHardwaresStatusEvent()
                                         "[{}] which isolated the hardware ",
                                         "[{}]", eId, hwInventoryPath->str)
                                         .c_str());
+                                commit<type::CommonError::InternalFailure>(
+                                    type::ErrorLogLevel::Informational);
                                 continue;
                             }
                             eventErrLogPath = logObjPath->str;
@@ -283,6 +288,8 @@ void Manager::restoreHardwaresStatusEvent()
                                     "[{}]",
                                     hwInventoryPath->str)
                                     .c_str());
+                            commit<type::CommonError::InternalFailure>(
+                                type::ErrorLogLevel::Informational);
                             continue;
                         }
                     }
@@ -295,6 +302,8 @@ void Manager::restoreHardwaresStatusEvent()
                                     "hardware [{}]",
                                     e.what(), pdbg_target_path(tgt))
                             .c_str());
+                    commit<type::CommonError::InternalFailure>(
+                        type::ErrorLogLevel::Informational);
                     continue;
                 }
             }
