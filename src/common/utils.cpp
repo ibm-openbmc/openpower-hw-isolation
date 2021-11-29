@@ -193,10 +193,11 @@ std::optional<sdbusplus::message::object_path>
     }
     catch (const sdbusplus::exception::SdBusError& e)
     {
-        log<level::ERR>(fmt::format("Failed to get BMC log id "
-                                    "for the given EID (aka PEL ID) [{}]",
-                                    eid)
-                            .c_str());
+        log<level::ERR>(
+            fmt::format("Exception [{}] when trying to get BMC log path "
+                        "for the given EID (aka PEL ID) [{}]",
+                        e.what(), eid)
+                .c_str());
         return std::nullopt;
     }
 }
