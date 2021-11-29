@@ -78,6 +78,8 @@ Manager::Manager(sdbusplus::bus::bus& bus,
             fmt::format("Exception [{}] while adding the D-Bus match rules",
                         e.what())
                 .c_str());
+        commit<type::CommonError::InternalFailure>(
+            type::ErrorLogLevel::Informational);
     }
 }
 
@@ -370,6 +372,11 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                     if (*propVal ==
                         "xyz.openbmc_project.State.Host.HostState.Quiesced")
                     {
+                        log<level::INFO>(
+                            fmt::format("HostState is {}, pull the deconfig "
+                                        "reason from the cec device tree.",
+                                        *propVal)
+                                .c_str());
                         restoreHardwaresStatusEvent();
                     }
                 }
@@ -381,6 +388,8 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                                     "property value while changed",
                                     message.get_signature())
                             .c_str());
+                    commit<type::CommonError::InternalFailure>(
+                        type::ErrorLogLevel::Informational);
                 }
                 // No need to look other properties
                 break;
@@ -395,6 +404,8 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                         "while changed",
                         e.what(), message.get_signature())
                 .c_str());
+        commit<type::CommonError::InternalFailure>(
+            type::ErrorLogLevel::Informational);
     }
 }
 
@@ -417,6 +428,11 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                     if (*propVal == "xyz.openbmc_project.State.Boot.Progress."
                                     "ProgressStages.SystemInitComplete")
                     {
+                        log<level::INFO>(
+                            fmt::format("BootProgress is {}, pull the deconfig "
+                                        "reason from the cec device tree.",
+                                        *propVal)
+                                .c_str());
                         restoreHardwaresStatusEvent();
                     }
                 }
@@ -428,6 +444,8 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                                     "property value while changed",
                                     message.get_signature())
                             .c_str());
+                    commit<type::CommonError::InternalFailure>(
+                        type::ErrorLogLevel::Informational);
                 }
                 // No need to look other properties
                 break;
@@ -442,6 +460,8 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                         "while changed",
                         e.what(), message.get_signature())
                 .c_str());
+        commit<type::CommonError::InternalFailure>(
+            type::ErrorLogLevel::Informational);
     }
 }
 
