@@ -98,10 +98,13 @@ std::pair<event::EventMsg, event::EventSeverity>
             return std::make_pair("Manual", event::EventSeverity::Ok);
         default:
             log<level::ERR>(
-                fmt::format("Unsupported hardware isolation entry [{}]",
-                            record::entry::EntryInterface::convertTypeToString(
-                                recSeverity))
+                fmt::format(
+                    "Unsupported hardware isolation entry severity [{}]",
+                    record::entry::EntryInterface::convertTypeToString(
+                        recSeverity))
                     .c_str());
+            commit<type::CommonError::InternalFailure>(
+                type::ErrorLogLevel::Informational);
             return std::make_pair("Unknown", event::EventSeverity::Warning);
     }
 }

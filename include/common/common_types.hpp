@@ -4,6 +4,7 @@
 
 #include <sdbusplus/server/object.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
+#include <xyz/openbmc_project/Logging/Entry/server.hpp>
 
 #include <string>
 #include <vector>
@@ -25,6 +26,8 @@ using AssociationDef =
     std::vector<std::tuple<AsscDefFwdType, AsscDefRevType, AssociatedObjPat>>;
 
 namespace CommonError = sdbusplus::xyz::openbmc_project::Common::Error;
+using ErrorLogLevel =
+    sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 
 constexpr auto ObjectMapperName = "xyz.openbmc_project.ObjectMapper";
 constexpr auto ObjectMapperPath = "/xyz/openbmc_project/object_mapper";
