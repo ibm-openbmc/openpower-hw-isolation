@@ -73,6 +73,8 @@ std::pair<event::EventMsg, event::EventSeverity>
                 fmt::format("Unsupported deconfigured reason is given [{}]",
                             reason)
                     .c_str());
+            commit<type::CommonError::InternalFailure>(
+                type::ErrorLogLevel::Informational);
             return std::make_pair("Unknown", event::EventSeverity::Warning);
     }
 }
