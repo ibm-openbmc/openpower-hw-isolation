@@ -15,7 +15,8 @@ namespace openpower_hw_status
  * - Enums to indicate non-error reason for a hardwares deconfiguration.
  * - These enuems used in HwasSate.deconfiguredByEid.
  * - The enums list is picked from OpenPOWER/Hostboot component.
- *   (src/include/usr/hwas/common/deconfigGard.H)
+ *   (src/include/usr/hwas/common/deconfigGard.H -
+ *    commit id: a0ac6056abbd587ae76a7c10032fd7e50ca5e529)
  */
 enum DeconfiguredByReason
 {
