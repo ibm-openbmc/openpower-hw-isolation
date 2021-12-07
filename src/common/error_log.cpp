@@ -357,10 +357,10 @@ void FFDCFiles::transformFFDCFiles(FFDCFilesInfo& ffdcFilesInfo)
 {
     std::transform(_ffdcFiles.begin(), _ffdcFiles.end(),
                    std::back_inserter(ffdcFilesInfo), [](const auto& ffdcFile) {
-                       return std::make_tuple(ffdcFile->getFFDCFormat(),
-                                              ffdcFile->getFFDCSubtype(),
-                                              ffdcFile->getFFDCVersion(),
-                                              ffdcFile->getFFDCFileFD());
+                       return std::make_tuple(ffdcFile->getFormat(),
+                                              ffdcFile->getSubType(),
+                                              ffdcFile->getVersion(),
+                                              ffdcFile->getFD());
                    });
 }
 
