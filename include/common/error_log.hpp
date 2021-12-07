@@ -15,6 +15,7 @@ namespace error_log
 
 using json = nlohmann::json;
 
+using Level = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 using CreateIface = sdbusplus::xyz::openbmc_project::Logging::server::Create;
 
 using FFDCFormat = CreateIface::FFDCFormat;
@@ -25,6 +26,10 @@ using FFDCFileFD = sdbusplus::message::unix_fd;
 using FFDCFileInfo =
     std::tuple<FFDCFormat, FFDCSubType, FFDCVersion, FFDCFileFD>;
 using FFDCFilesInfo = std::vector<FFDCFileInfo>;
+
+constexpr auto HwIsolationGenericErrMsg =
+    "org.open_power.HardwareIsolation.Error";
+constexpr auto CollectTraces = true;
 
 /**
  * @class FFDCFile
@@ -243,6 +248,24 @@ class FFDCFiles
     void createFFDCFileforCallouts(const json& calloutsDetails);
 
 }; // end of FFDCFiles class
+
+/**
+ * @brief Create the error log with additional FFDC data and callout details
+ *
+ * @param[in] errMsg - the error message id which is be defined
+ *                     in the error log message registries.
+ * @param[in] errSeverity - The error log severity
+ * @param[in] collectTraces - collect traces to add in the error log
+ * @param[in] calloutsDetails - callouts details to add in the error log
+ *
+ * @return void
+ *
+ * @note If the caller doesn't pass the collectTraces or calloutsDetails
+ * values then, this API won't add those sections in the error log.
+ */
+void createErrorLog(const std::string& errMsg, const Level& errSeverity,
+                    const bool collectTraces = CollectTraces,
+                    const json& calloutsDetails = {});
 
 } // namespace error_log
 } // namespace hw_isolation

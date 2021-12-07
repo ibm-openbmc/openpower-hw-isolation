@@ -4,7 +4,6 @@
 
 #include <sdbusplus/server/object.hpp>
 #include <xyz/openbmc_project/Common/error.hpp>
-#include <xyz/openbmc_project/Logging/Entry/server.hpp>
 
 #include <string>
 #include <vector>
@@ -26,14 +25,13 @@ using AssociationDef =
     std::vector<std::tuple<AsscDefFwdType, AsscDefRevType, AssociatedObjPat>>;
 
 namespace CommonError = sdbusplus::xyz::openbmc_project::Common::Error;
-using ErrorLogLevel =
-    sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 
 constexpr auto ObjectMapperName = "xyz.openbmc_project.ObjectMapper";
 constexpr auto ObjectMapperPath = "/xyz/openbmc_project/object_mapper";
 
 constexpr auto LoggingObjectPath = "/xyz/openbmc_project/logging";
 constexpr auto LoggingInterface = "org.open_power.Logging.PEL";
+constexpr auto LoggingCreateIface = "xyz.openbmc_project.Logging.Create";
 
 } // namespace type
 } // namespace hw_isolation

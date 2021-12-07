@@ -2,6 +2,9 @@
 
 #include "common/error_log.hpp"
 
+#include "common/common_types.hpp"
+#include "common/utils.hpp"
+
 #include <fcntl.h>
 #include <fmt/format.h>
 
@@ -368,6 +371,57 @@ void FFDCFiles::transformFFDCFiles(FFDCFilesInfo& ffdcFilesInfo)
                            ffdcFile->getFormat(), ffdcFile->getSubType(),
                            ffdcFile->getVersion(), ffdcFile->getFD());
                    });
+}
+
+void createErrorLog(const std::string& errMsg, const Level& errSeverity,
+                    const bool collectTraces, const json& calloutsDetails)
+{
+    try
+    {
+        FFDCFiles ffdcFiles(collectTraces, calloutsDetails);
+        FFDCFilesInfo ffdcFilesInfo;
+        ffdcFiles.transformFFDCFiles(ffdcFilesInfo);
+
+        auto bus = sdbusplus::bus::new_default();
+        std::string service = utils::getDBusServiceName(
+            bus, type::LoggingObjectPath, type::LoggingCreateIface);
+        auto method = bus.new_method_call(
+            service.c_str(), type::LoggingObjectPath, type::LoggingCreateIface,
+            "CreateWithFFDCFiles");
+
+        auto errSeverityStr =
+            sdbusplus::xyz::openbmc_project::Logging::server::convertForMessage(
+                errSeverity);
+
+        std::map<std::string, std::string> additionalData;
+        additionalData.emplace("_PID", std::to_string(getpid()));
+
+        method.append(errMsg, errSeverityStr, additionalData, ffdcFilesInfo);
+
+        auto resp = bus.call(method);
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        // Don't throw the exception, we should allow the caller to proceed
+        // further since caller might call this in the failure case.
+        log<level::ERR>(
+            fmt::format("D-Bus Exception [{}], failed to create "
+                        "the error log for the error [{}]. ObjectPath [{}] "
+                        "and Interface [{}]",
+                        e.what(), errMsg, type::LoggingObjectPath,
+                        type::LoggingCreateIface)
+                .c_str());
+    }
+    catch (const std::exception& e)
+    {
+        // Don't throw the exception, we should allow the caller to proceed
+        // further since caller might call this in the failure case.
+        log<level::ERR>(
+            fmt::format("Exception [{}], failed to create the error log "
+                        "for the error [{}]",
+                        e.what(), errMsg)
+                .c_str());
+    }
 }
 
 } // namespace error_log

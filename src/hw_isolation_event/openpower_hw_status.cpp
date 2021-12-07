@@ -2,6 +2,8 @@
 
 #include "hw_isolation_event/openpower_hw_status.hpp"
 
+#include "common/error_log.hpp"
+
 #include <fmt/format.h>
 
 #include <phosphor-logging/elog-errors.hpp>
@@ -73,8 +75,9 @@ std::pair<event::EventMsg, event::EventSeverity>
                 fmt::format("Unsupported deconfigured reason is given [{}]",
                             reason)
                     .c_str());
-            commit<type::CommonError::InternalFailure>(
-                type::ErrorLogLevel::Informational);
+            error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                      error_log::Level::Informational,
+                                      error_log::CollectTraces);
             return std::make_pair("Unknown", event::EventSeverity::Warning);
     }
 }

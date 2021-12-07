@@ -9,6 +9,7 @@ extern "C"
 
 #include "attributes_info.H"
 
+#include "common/error_log.hpp"
 #include "common/utils.hpp"
 #include "hw_isolation_event/hw_status_manager.hpp"
 #include "hw_isolation_event/openpower_hw_status.hpp"
@@ -78,8 +79,9 @@ Manager::Manager(sdbusplus::bus::bus& bus,
             fmt::format("Exception [{}] while adding the D-Bus match rules",
                         e.what())
                 .c_str());
-        commit<type::CommonError::InternalFailure>(
-            type::ErrorLogLevel::Informational);
+        error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                  error_log::Level::Informational,
+                                  error_log::CollectTraces);
     }
 }
 
@@ -160,8 +162,9 @@ std::pair<event::EventMsg, event::EventSeverity>
                     record::entry::EntryInterface::convertTypeToString(
                         recSeverity))
                     .c_str());
-            commit<type::CommonError::InternalFailure>(
-                type::ErrorLogLevel::Informational);
+            error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                      error_log::Level::Informational,
+                                      error_log::CollectTraces);
             return std::make_pair("Unknown", event::EventSeverity::Warning);
     }
 }
@@ -187,8 +190,10 @@ void Manager::restoreHardwaresStatusEvent()
                                         "ATTR_HWAS_STATE from [{}]",
                                         pdbg_target_path(tgt))
                                 .c_str());
-                        commit<type::CommonError::InternalFailure>(
-                            type::ErrorLogLevel::Informational);
+                        error_log::createErrorLog(
+                            error_log::HwIsolationGenericErrMsg,
+                            error_log::Level::Informational,
+                            error_log::CollectTraces);
                         continue;
                     }
 
@@ -204,8 +209,10 @@ void Manager::restoreHardwaresStatusEvent()
                                     "ATTR_PHYS_BIN_PATH from [{}]",
                                     pdbg_target_path(tgt))
                                     .c_str());
-                            commit<type::CommonError::InternalFailure>(
-                                type::ErrorLogLevel::Informational);
+                            error_log::createErrorLog(
+                                error_log::HwIsolationGenericErrMsg,
+                                error_log::Level::Informational,
+                                error_log::CollectTraces);
                             continue;
                         }
 
@@ -227,8 +234,10 @@ void Manager::restoreHardwaresStatusEvent()
                                     "hardware [{}]",
                                     pdbg_target_path(tgt))
                                     .c_str());
-                            commit<type::CommonError::InternalFailure>(
-                                type::ErrorLogLevel::Informational);
+                            error_log::createErrorLog(
+                                error_log::HwIsolationGenericErrMsg,
+                                error_log::Level::Informational,
+                                error_log::CollectTraces);
                             continue;
                         }
 
@@ -295,8 +304,10 @@ void Manager::restoreHardwaresStatusEvent()
                                         "[{}] which isolated the hardware ",
                                         "[{}]", eId, hwInventoryPath->str)
                                         .c_str());
-                                commit<type::CommonError::InternalFailure>(
-                                    type::ErrorLogLevel::Informational);
+                                error_log::createErrorLog(
+                                    error_log::HwIsolationGenericErrMsg,
+                                    error_log::Level::Informational,
+                                    error_log::CollectTraces);
                                 continue;
                             }
                             eventErrLogPath = logObjPath->str;
@@ -331,8 +342,10 @@ void Manager::restoreHardwaresStatusEvent()
                                     "[{}]",
                                     hwInventoryPath->str)
                                     .c_str());
-                            commit<type::CommonError::InternalFailure>(
-                                type::ErrorLogLevel::Informational);
+                            error_log::createErrorLog(
+                                error_log::HwIsolationGenericErrMsg,
+                                error_log::Level::Informational,
+                                error_log::CollectTraces);
                             continue;
                         }
                     }
@@ -345,8 +358,10 @@ void Manager::restoreHardwaresStatusEvent()
                                     "hardware [{}]",
                                     e.what(), pdbg_target_path(tgt))
                             .c_str());
-                    commit<type::CommonError::InternalFailure>(
-                        type::ErrorLogLevel::Informational);
+                    error_log::createErrorLog(
+                        error_log::HwIsolationGenericErrMsg,
+                        error_log::Level::Informational,
+                        error_log::CollectTraces);
                     continue;
                 }
             }
@@ -388,8 +403,10 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                                     "property value while changed",
                                     message.get_signature())
                             .c_str());
-                    commit<type::CommonError::InternalFailure>(
-                        type::ErrorLogLevel::Informational);
+                    error_log::createErrorLog(
+                        error_log::HwIsolationGenericErrMsg,
+                        error_log::Level::Informational,
+                        error_log::CollectTraces);
                 }
                 // No need to look other properties
                 break;
@@ -404,8 +421,9 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                         "while changed",
                         e.what(), message.get_signature())
                 .c_str());
-        commit<type::CommonError::InternalFailure>(
-            type::ErrorLogLevel::Informational);
+        error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                  error_log::Level::Informational,
+                                  error_log::CollectTraces);
     }
 }
 
@@ -444,8 +462,10 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                                     "property value while changed",
                                     message.get_signature())
                             .c_str());
-                    commit<type::CommonError::InternalFailure>(
-                        type::ErrorLogLevel::Informational);
+                    error_log::createErrorLog(
+                        error_log::HwIsolationGenericErrMsg,
+                        error_log::Level::Informational,
+                        error_log::CollectTraces);
                 }
                 // No need to look other properties
                 break;
@@ -460,8 +480,9 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                         "while changed",
                         e.what(), message.get_signature())
                 .c_str());
-        commit<type::CommonError::InternalFailure>(
-            type::ErrorLogLevel::Informational);
+        error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                  error_log::Level::Informational,
+                                  error_log::CollectTraces);
     }
 }
 
