@@ -32,7 +32,7 @@ class FFDCFile
     FFDCFile& operator=(FFDCFile&&) = delete;
 
     /**
-     * @brief Used to created the FFDC file with the given format and data
+     * @brief Used to create the FFDC file with the given format and data
      *
      * @param[in] format - The FFDC file format.
      * @param[in] subType - The FFDC file subtype.
@@ -52,28 +52,28 @@ class FFDCFile
      *
      * @return file descriptor id
      */
-    int getFFDCFileFD() const;
+    int getFD() const;
 
     /**
      * @brief Used to get created ffdc file format.
      *
      * @return ffdc file format.
      */
-    FFDCFormat getFFDCFormat() const;
+    FFDCFormat getFormat() const;
 
     /**
      * @brief Used to get created ffdc file subtype.
      *
      * @return ffdc file subtype.
      */
-    FFDCSubType getFFDCSubtype() const;
+    FFDCSubType getSubType() const;
 
     /**
      * @brief Used to get created ffdc file version.
      *
      * @return ffdc file version.
      */
-    FFDCVersion getFFDCVersion() const;
+    FFDCVersion getVersion() const;
 
   private:
     /**
@@ -87,7 +87,7 @@ class FFDCFile
     FFDCSubType _subType;
 
     /**
-     * @brief Used to store ffdc subtype.
+     * @brief Used to store ffdc version.
      */
     FFDCVersion _version;
 
@@ -109,24 +109,21 @@ class FFDCFile
     /**
      * @brief Used to create ffdc file to pass in the error log request
      *
-     * @return void on success
-     *         Throw an exception on failure
+     * @return Throw an exception on failure
      */
     void prepareFFDCFile();
 
     /**
      * @brief Create unique ffdc file.
      *
-     * @return void on success
-     *         Throw an exception on failure
+     * @return Throw an exception on failure
      */
     void createFFDCFile();
 
     /**
      * @brief Used write ffdc data into the created file.
      *
-     * @return void on success
-     *         Throw an exception on failure
+     * @return Throw an exception on failure
      */
     void writeFFDCData();
 
@@ -134,16 +131,14 @@ class FFDCFile
      * @brief Used set ffdc file seek position begining to consume by the
      *        error log
      *
-     * @return void on success
-     *         Throw an exception on failure
+     * @return Throw an exception on failure
      */
     void setFFDCFileSeekPos();
 
     /**
      * @brief Used to remove created ffdc file.
      *
-     * @return void on success
-     *         Throw an exception on failure
+     * @return Throw an exception on failure
      */
     void removeFFDCFile();
 

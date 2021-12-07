@@ -17,13 +17,9 @@ using namespace phosphor::logging;
 FFDCFile::FFDCFile(const FFDCFormat& format, const FFDCSubType& subType,
                    const FFDCVersion& version, const std::string& data) :
     _format(format),
-    _subType(subType), _version(version), _fd(-1), _data(data)
+    _subType(subType), _version(version),
+    _fileName("/tmp/hwIsolationFFDCFile.XXXXXX"), _fd(-1), _data(data)
 {
-    // Prepare temporary file name based on the given FFDC format
-    _fileName = (std::string("/tmp/hwIsolation") +
-                 CreateIface::convertFFDCFormatToString(_format) +
-                 std::string(".XXXXXX"));
-
     prepareFFDCFile();
 }
 
@@ -32,22 +28,22 @@ FFDCFile::~FFDCFile()
     removeFFDCFile();
 }
 
-int FFDCFile::getFFDCFileFD() const
+int FFDCFile::getFD() const
 {
     return _fd;
 }
 
-FFDCFormat FFDCFile::getFFDCFormat() const
+FFDCFormat FFDCFile::getFormat() const
 {
     return _format;
 }
 
-FFDCSubType FFDCFile::getFFDCSubtype() const
+FFDCSubType FFDCFile::getSubType() const
 {
     return _subType;
 }
 
-FFDCVersion FFDCFile::getFFDCVersion() const
+FFDCVersion FFDCFile::getVersion() const
 {
     return _version;
 }
