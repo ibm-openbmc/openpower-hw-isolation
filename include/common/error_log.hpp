@@ -168,11 +168,10 @@ class FFDCFiles
     FFDCFiles& operator=(FFDCFiles&&) = delete;
 
     /**
-     * @brief Used to created the FFDC files based on the given inputs
+     * @brief Used to create the FFDC files based on the given inputs
      *
-     * @param[in] collectTraces - Used to indicate whether wants to collect
-     *                            the traces or not. If yes, create
-     *                            a FFDCFile for the same.
+     * @param[in] collectTraces - Used to create the FFDC file for
+     *                            the traces if required.
      * @param[in] calloutsDetails - Used to create the FFDC file for
      *                              the callouts if exist.
      */
