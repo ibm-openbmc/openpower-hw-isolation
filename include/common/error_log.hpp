@@ -209,8 +209,9 @@ class FFDCFiles
                               const std::string& fieldName);
 
     /**
-     * @brief Helper API to get the traces from systemd journal entries
-     *        based on the given field name and value.
+     * @brief Helper API to get the last requested number of traces
+     *        from systemd journal entries based on the given field name
+     *        and value. By default, it will collect last 10 traces.
      *
      * @param[in] fieldName - The field name to search.
      * @param[in] fieldValue - The field value to search.
@@ -228,7 +229,7 @@ class FFDCFiles
      * @brief Used to collect the systemd journal traces and create the
      *        FFDCFile
      *
-     * @return void
+     * @return Throw Exceptions on failure.
      */
     void createFFDCFileForTraces();
 
@@ -237,7 +238,7 @@ class FFDCFiles
      *
      * @param[in] calloutsDetails - callouts detailsto create ffdc file
      *
-     * @return void
+     * @return Throw Exceptions on failure.
      */
     void createFFDCFileforCallouts(const json& calloutsDetails);
 

@@ -129,7 +129,10 @@ FFDCFiles::FFDCFiles(const bool collectTraces, const json& calloutsDetails)
              * Don't throw the exception, we should create FFDCFiles as much as
              * possible to create the error log.
              */
-            log<level::ERR>(fmt::format("Exception [{}]", e.what()).c_str());
+            log<level::ERR>(
+                fmt::format("Exception [{}], failed to collect traces",
+                            e.what())
+                    .c_str());
         }
     }
 
@@ -146,7 +149,10 @@ FFDCFiles::FFDCFiles(const bool collectTraces, const json& calloutsDetails)
              * Don't throw the exception, we should create FFDCFiles as much as
              * possible to create the error log.
              */
-            log<level::ERR>(fmt::format("Exception [{}]", e.what()).c_str());
+            log<level::ERR>(
+                fmt::format("Exception [{}], failed to include callout details",
+                            e.what())
+                    .c_str());
         }
     }
 }
@@ -163,7 +169,8 @@ std::optional<std::string>
                                 reinterpret_cast<const void**>(&data), &length);
         rc == 0)
     {
-        // Get field value
+        // Get field value, constructing by the returned length so we can use
+        // std::string::c_str if needs null-terminated string.
         std::string fieldValue(data, length);
 
         // The data returned  by sd_journal_get_data will be prefixed with the
@@ -357,10 +364,9 @@ void FFDCFiles::transformFFDCFiles(FFDCFilesInfo& ffdcFilesInfo)
 {
     std::transform(_ffdcFiles.begin(), _ffdcFiles.end(),
                    std::back_inserter(ffdcFilesInfo), [](const auto& ffdcFile) {
-                       return std::make_tuple(ffdcFile->getFormat(),
-                                              ffdcFile->getSubType(),
-                                              ffdcFile->getVersion(),
-                                              ffdcFile->getFD());
+                       return std::make_tuple(
+                           ffdcFile->getFormat(), ffdcFile->getSubType(),
+                           ffdcFile->getVersion(), ffdcFile->getFD());
                    });
 }
 
