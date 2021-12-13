@@ -43,13 +43,13 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
 
         {dimmHwId, IsolatableHWs::HW_Details(
                        ItIsFRU, emptyHwId, devtree::lookup_func::locationCode,
-                       inv_path_lookup_func::itemObjName, "")},
+                       inv_path_lookup_func::itemLocationCode, "")},
 
         {IsolatableHWs::HW_Details::HwId(
              "xyz.openbmc_project.Inventory.Item.Tpm", "tpm", "tpm"),
          IsolatableHWs::HW_Details(ItIsFRU, emptyHwId,
                                    devtree::lookup_func::locationCode,
-                                   inv_path_lookup_func::itemObjName, "")},
+                                   inv_path_lookup_func::itemLocationCode, "")},
 
         // Processor Subunits
 
@@ -647,9 +647,10 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
 
             auto isolateHwPath = std::find_if(
                 inventoryPathList->begin(), inventoryPathList->end(),
-                [&isolateHw, &isolatedHwDetails, this](const auto& path) {
+                [&isolateHw, &isolatedHwDetails, &isolatedHwInfo,
+                 this](const auto& path) {
                     return isolatedHwDetails->second._invPathFuncLookUp(
-                        path, isolateHw, this->_bus);
+                        path, isolateHw, isolatedHwInfo.first, this->_bus);
                 });
 
             if (isolateHwPath == inventoryPathList->end())
@@ -705,9 +706,10 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
             auto parentFruPath = std::find_if(
                 parentFruInventoryPathList->begin(),
                 parentFruInventoryPathList->end(),
-                [&parentFruHw, &parentFruHwDetails, this](const auto& path) {
+                [&parentFruHw, &parentFruHwDetails, &parentFruHwInfo,
+                 this](const auto& path) {
                     return parentFruHwDetails->second._invPathFuncLookUp(
-                        path, parentFruHw, this->_bus);
+                        path, parentFruHw, parentFruHwInfo.first, this->_bus);
                 });
             if (parentFruPath == parentFruInventoryPathList->end())
             {
@@ -774,9 +776,10 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
 
             auto isolateHwPath = std::find_if(
                 childsInventoryPath->begin(), childsInventoryPath->end(),
-                [&isolateHw, &isolatedHwDetails, this](const auto& path) {
+                [&isolateHw, &isolatedHwDetails, &parentFruHwInfo,
+                 this](const auto& path) {
                     return isolatedHwDetails->second._invPathFuncLookUp(
-                        path, isolateHw, this->_bus);
+                        path, isolateHw, parentFruHwInfo.first, this->_bus);
                 });
 
             if (isolateHwPath == childsInventoryPath->end())
@@ -804,15 +807,9 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
 namespace inv_path_lookup_func
 {
 
-IsItIsoHwInvPath itemObjName(const sdbusplus::message::object_path& objPath,
-                             const std::string& instance,
-                             sdbusplus::bus::bus& /* bus */)
-{
-    return objPath.filename().find(instance) != std::string::npos;
-}
-
 IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
                               const std::string& instance,
+                              const type::LocationCode& /* locCode */,
                               sdbusplus::bus::bus& /* bus */)
 {
     return objPath.filename() == instance;
@@ -820,6 +817,7 @@ IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
 
 IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
                                 const std::string& instance,
+                                const type::LocationCode& /* locCode */,
                                 sdbusplus::bus::bus& bus)
 {
     try
@@ -832,6 +830,37 @@ IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
     {
         log<level::WARNING>(fmt::format("Exception [{}] to get PrettyName for "
                                         "the given object path [{}]",
+                                        e.what(), objPath.str)
+                                .c_str());
+        return false;
+    }
+}
+
+IsItIsoHwInvPath
+    itemLocationCode(const sdbusplus::message::object_path& objPath,
+                     const std::string& /* instance */,
+                     const type::LocationCode& locCode,
+                     sdbusplus::bus::bus& bus)
+{
+    try
+    {
+        auto expandedLocCode = utils::getDBusPropertyVal<std::string>(
+            bus, objPath,
+            "xyz.openbmc_project.Inventory.Decorator.LocationCode",
+            "LocationCode");
+
+        auto unExpandedLocCode{devtree::getUnexpandedLocCode(expandedLocCode)};
+        if (!unExpandedLocCode.has_value())
+        {
+            return false;
+        }
+
+        return *unExpandedLocCode == locCode;
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        log<level::WARNING>(fmt::format("Exception [{}] to get LocationCode "
+                                        "for the given object path [{}]",
                                         e.what(), objPath.str)
                                 .c_str());
         return false;

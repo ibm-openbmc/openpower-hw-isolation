@@ -26,6 +26,7 @@ using IsItIsoHwInvPath = bool;
  * @param[in] object_path - the inventory object path to check whether the
  *                          isolated hardware inventory object path or not
  * @param[in] string - the isolated hardware instance details
+ * @param[in] LocationCode - the location code of the isolated hardware
  * @param[in] bus - the attached bus
  *
  * @return IsItIsoHwInvPath to indicate whether the given inventory object
@@ -34,21 +35,23 @@ using IsItIsoHwInvPath = bool;
  * @note All lookup functions which are added in this namespace should
  *       match with below signature.
  */
-using LookupFuncForInvPath =
-    std::function<IsItIsoHwInvPath(const sdbusplus::message::object_path&,
-                                   const std::string&, sdbusplus::bus::bus&)>;
-
-IsItIsoHwInvPath itemObjName(const sdbusplus::message::object_path& objPath,
-                             const std::string& instance,
-                             sdbusplus::bus::bus& bus);
+using LookupFuncForInvPath = std::function<IsItIsoHwInvPath(
+    const sdbusplus::message::object_path&, const std::string&,
+    const type::LocationCode&, sdbusplus::bus::bus&)>;
 
 IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
                               const std::string& instance,
+                              const type::LocationCode& locCode,
                               sdbusplus::bus::bus& bus);
 
 IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
                                 const std::string& instance,
+                                const type::LocationCode& locCode,
                                 sdbusplus::bus::bus& bus);
+
+IsItIsoHwInvPath itemLocationCode(
+    const sdbusplus::message::object_path& objPath, const std::string& instance,
+    const type::LocationCode& locCode, sdbusplus::bus::bus& bus);
 
 } // namespace inv_path_lookup_func
 
