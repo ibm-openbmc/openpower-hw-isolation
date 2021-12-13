@@ -235,33 +235,56 @@ LocationCode IsolatableHWs::getLocationCode(
 std::optional<sdbusplus::message::object_path>
     IsolatableHWs::getParentFruObjPath(
         const sdbusplus::message::object_path& isolateHardware,
-        const IsolatableHWs::HW_Details::HwId::ItemObjectName&
-            parentFruObjectName) const
+        const IsolatableHWs::HW_Details::HwId::ItemInterfaceName&
+            parentFruIfaceName) const
 {
-    size_t startPosOfFruObj =
-        isolateHardware.str.find(parentFruObjectName._name);
-    if (startPosOfFruObj == std::string::npos)
+    std::map<std::string, std::map<std::string, std::vector<std::string>>>
+        parentObjs;
+
+    try
+    {
+        auto method =
+            _bus.new_method_call(type::ObjectMapperName, type::ObjectMapperPath,
+                                 type::ObjectMapperName, "GetAncestors");
+
+        method.append(isolateHardware.str);
+        method.append(std::vector<std::string>({parentFruIfaceName._name}));
+
+        auto reply = _bus.call(method);
+        reply.read(parentObjs);
+    }
+    catch (const sdbusplus::exception::exception& e)
     {
         log<level::ERR>(
-            fmt::format("Failed to get parent fru object [{}] "
-                        "path for isolate hardware object path [{}].",
-                        parentFruObjectName._name, isolateHardware.str)
+            fmt::format("Exception [{}] to get the given object [{}] parent "
+                        "by using the given parent interface [{}]",
+                        e.what(), isolateHardware.str, parentFruIfaceName._name)
                 .c_str());
         return std::nullopt;
     }
 
-    size_t endPosOfFruObj = isolateHardware.str.find("/", startPosOfFruObj);
-    if (endPosOfFruObj == std::string::npos)
+    if (parentObjs.empty())
     {
         log<level::ERR>(
-            fmt::format("Failed to get parent fru object [{}] "
-                        "path for isolate hardware object path [{}].",
-                        parentFruObjectName._name, isolateHardware.str)
+            fmt::format("The given object [{}] does not contain any parent "
+                        "with the given parent interface [{}]",
+                        isolateHardware.str, parentFruIfaceName._name)
+                .c_str());
+        return std::nullopt;
+    }
+    else if (parentObjs.size() > 1)
+    {
+        // Should not happen, Always we will have one parent object with
+        // the given parent interface for the given child object.
+        log<level::ERR>(
+            fmt::format("The given object [{}] contain more than one parent "
+                        "with the given parent interface [{}]",
+                        isolateHardware.str, parentFruIfaceName._name)
                 .c_str());
         return std::nullopt;
     }
 
-    return isolateHardware.str.substr(0, endPosOfFruObj);
+    return parentObjs.begin()->first;
 }
 
 std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
@@ -348,7 +371,7 @@ std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
         {
             auto parentFruObjPath = getParentFruObjPath(
                 isolateHardware,
-                isolateHwDetails->second._parentFruHwId._itemObjectName);
+                isolateHwDetails->second._parentFruHwId._interfaceName);
             if (!parentFruObjPath.has_value())
             {
                 return std::nullopt;

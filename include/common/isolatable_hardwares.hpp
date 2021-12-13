@@ -302,15 +302,15 @@ class IsolatableHWs
      *        by using isolate hardware dbus object path
      *
      * @param[in] isolateHardware - isolate hardware dbus object path
-     * @param[in] parentFruObjectName - isolate hardware parent fru objec name
+     * @param[in] parentFruIfaceName - isolate hardware parent fru interface
      *
      * @return Parent FRU dbus object path on success
      *         or an empty optional if not found.
      */
     std::optional<sdbusplus::message::object_path> getParentFruObjPath(
         const sdbusplus::message::object_path& isolateHardware,
-        const IsolatableHWs::HW_Details::HwId::ItemObjectName&
-            parentFruObjectName) const;
+        const IsolatableHWs::HW_Details::HwId::ItemInterfaceName&
+            parentFruIfaceName) const;
 
     /**
      * @brief Used to get the list of inventory object path by using
