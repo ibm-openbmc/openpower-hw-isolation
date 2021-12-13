@@ -228,7 +228,8 @@ LocationCode IsolatableHWs::getLocationCode(
     const sdbusplus::message::object_path& dbusObjPath)
 {
     return utils::getDBusPropertyVal<LocationCode>(
-        _bus, dbusObjPath, "com.ibm.ipzvpd.Location", "LocationCode");
+        _bus, dbusObjPath,
+        "xyz.openbmc_project.Inventory.Decorator.LocationCode", "LocationCode");
 }
 
 std::optional<sdbusplus::message::object_path>
