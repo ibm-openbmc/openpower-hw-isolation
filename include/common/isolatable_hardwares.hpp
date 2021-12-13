@@ -287,6 +287,18 @@ class IsolatableHWs
         getIsotableHWDetails(const HW_Details::HwId& id) const;
 
     /**
+     * @brief Get the HwID based on the given D-Bus object path.
+     *
+     * @param[in] dbusObjPath - The D-Bus object to get HwID.
+     *
+     * @return the hardware details for the given D-Bus object path
+     *         or an empty optional if not found.
+     */
+    std::optional<std::pair<HW_Details::HwId, HW_Details>>
+        getIsotableHWDetailsByObjPath(
+            const sdbusplus::message::object_path& dbusObjPath) const;
+
+    /**
      * @brief Used to get location code from given dbus object path
      *
      * @param[in] dbusObjPath - Dbus object path to get location code

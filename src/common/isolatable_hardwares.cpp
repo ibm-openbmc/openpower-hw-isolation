@@ -224,6 +224,109 @@ std::optional<
     return std::nullopt;
 }
 
+std::optional<
+    std::pair<IsolatableHWs::HW_Details::HwId, IsolatableHWs::HW_Details>>
+    IsolatableHWs::getIsotableHWDetailsByObjPath(
+        const sdbusplus::message::object_path& dbusObjPath) const
+{
+    std::map<std::string, std::vector<std::string>> objServs;
+
+    try
+    {
+        auto method =
+            _bus.new_method_call(type::ObjectMapperName, type::ObjectMapperPath,
+                                 type::ObjectMapperName, "GetObject");
+
+        method.append(dbusObjPath.str);
+        method.append(std::vector<std::string>({}));
+
+        auto reply = _bus.call(method);
+        reply.read(objServs);
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception [{}] to get the given object "
+                                    "[{}] interfaces",
+                                    e.what(), dbusObjPath.str)
+                            .c_str());
+        return std::nullopt;
+    }
+
+    /**
+     * Get only inventory item interface alone so we can minimize
+     * iteration to get isolatable hardware details.
+     *
+     * Note, "xyz.openbmc_project.Inventory.Item" is generic interface
+     * so no need to look for that.
+     */
+    std::vector<std::pair<std::string, std::string>> inventoryItemIfaces;
+    std::for_each(objServs.begin(), objServs.end(),
+                  [&inventoryItemIfaces](const auto& service) {
+                      auto inventoryItemIfaceIt = std::find_if(
+                          service.second.begin(), service.second.end(),
+                          [](const auto& interface) {
+                              return ((interface.find("Inventory.Item") !=
+                                       std::string::npos) &&
+                                      (!interface.ends_with("Item")));
+                          });
+
+                      if (inventoryItemIfaceIt != service.second.end())
+                      {
+                          inventoryItemIfaces.emplace_back(std::make_pair(
+                              service.first, *inventoryItemIfaceIt));
+                      }
+                  });
+
+    if (inventoryItemIfaces.empty())
+    {
+        log<level::ERR>(fmt::format("The given object [{}] does not contains "
+                                    "any inventory item interface",
+                                    dbusObjPath.str)
+                            .c_str());
+        return std::nullopt;
+    }
+    else if (inventoryItemIfaces.size() > 1)
+    {
+        /**
+         * FIXME: Assumption is, the OpenBMC project does not allow to host
+         *        the same interface by the different services, and more than
+         *        one different inventory item interface (since those will be
+         *        achieved by the Association) in the same object.
+         */
+        std::stringstream objData;
+        std::for_each(inventoryItemIfaces.begin(), inventoryItemIfaces.end(),
+                      [&objData](const auto& ele) {
+                          objData << "Service: " << ele.first
+                                  << " Iface: " << ele.second << " | ";
+                      });
+
+        log<level::ERR>(
+            fmt::format("Either the same interface is hosted "
+                        "by different services or different inventory item "
+                        "interfaces are hosted in the same object [{}]. "
+                        "ObjectData [{}]",
+                        dbusObjPath.str, objData.str())
+                .c_str());
+        return std::nullopt;
+    }
+
+    auto objHwId{IsolatableHWs::HW_Details::HwId{
+        IsolatableHWs::HW_Details::HwId::ItemInterfaceName(
+            inventoryItemIfaces[0].second)}};
+
+    // TODO Below decision need to be based on system core mode
+    //     i.e whether need to use "fc" (in big core system) or
+    //     "core" (in small core system) pdbg target class to get
+    //     the appropriate isotable hardware details.
+    if (objHwId._interfaceName._name.ends_with("CpuCore"))
+    {
+        objHwId = IsolatableHWs::HW_Details::HwId{
+            IsolatableHWs::HW_Details::HwId::PhalPdbgClassName("fc")};
+    }
+
+    return getIsotableHWDetails(objHwId);
+}
+
 LocationCode IsolatableHWs::getLocationCode(
     const sdbusplus::message::object_path& dbusObjPath)
 {
@@ -309,28 +412,14 @@ std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
             return std::nullopt;
         }
 
-        auto isolateHwId = IsolatableHWs::HW_Details::HwId{
-            IsolatableHWs::HW_Details::HwId::ItemObjectName(
-                isolateHwInstanceInfo->first)};
-
-        // TODO Below decision need to be based on system core mode
-        //     i.e whether need to use "fc" (in big core system) or
-        //     "core" (in small core system) pdbg target class to get
-        //     the appropriate target physical path from the phal
-        //     cec device tree but, now using the "fc".
-        if (isolateHwInstanceInfo->first._name == "core")
-        {
-            isolateHwId = IsolatableHWs::HW_Details::HwId{
-                IsolatableHWs::HW_Details::HwId::PhalPdbgClassName("fc")};
-        }
-
-        auto isolateHwDetails = getIsotableHWDetails(isolateHwId);
+        auto isolateHwDetails = getIsotableHWDetailsByObjPath(isolateHardware);
         if (!isolateHwDetails.has_value())
         {
             log<level::ERR>(
-                fmt::format("Given isolate hardware object name [{}] "
-                            "is not found in isolatable hardware list",
-                            isolateHardware.filename())
+                fmt::format("The given hardware inventory object [{}] "
+                            "item interface is not found in isolatable "
+                            "hardware list",
+                            isolateHardware.str)
                     .c_str());
             return std::nullopt;
         }
