@@ -225,7 +225,7 @@ std::pair<LocationCode, InstanceId> getFRUDetails(struct pdbg_target* fruTgt)
             pdbg_target_path(fruTgt));
     }
 
-    InstanceId instanceId = 0xFFFFFFFF;
+    InstanceId instanceId{type::Invalid_InstId};
     ATTR_MRU_ID_Type mruId;
     /**
      * The use case is, get mru id if present in the FRU target

@@ -33,5 +33,7 @@ constexpr auto LoggingObjectPath = "/xyz/openbmc_project/logging";
 constexpr auto LoggingInterface = "org.open_power.Logging.PEL";
 constexpr auto LoggingCreateIface = "xyz.openbmc_project.Logging.Create";
 
+constexpr InstanceId Invalid_InstId = 0xFFFFFFFF;
+
 } // namespace type
 } // namespace hw_isolation

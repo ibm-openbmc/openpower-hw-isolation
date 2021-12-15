@@ -23,11 +23,11 @@ using IsItIsoHwInvPath = bool;
 /**
  * @brief Lookup function signature
  *
+ *
+ * @param[in] bus - the attached bus
  * @param[in] object_path - the inventory object path to check whether the
  *                          isolated hardware inventory object path or not
- * @param[in] string - the isolated hardware instance details
- * @param[in] LocationCode - the location code of the isolated hardware
- * @param[in] bus - the attached bus
+ * @param[in] variant - the isolated hardware id
  *
  * @return IsItIsoHwInvPath to indicate whether the given inventory object
  *         path is isolated hardware inventory path (maybe its parent) or not.
@@ -35,23 +35,25 @@ using IsItIsoHwInvPath = bool;
  * @note All lookup functions which are added in this namespace should
  *       match with below signature.
  */
+// type::LocationCode and PrettyName are string type.
+using UniqueHwId = std::variant<type::InstanceId, std::string>;
+
 using LookupFuncForInvPath = std::function<IsItIsoHwInvPath(
-    const sdbusplus::message::object_path&, const std::string&,
-    const type::LocationCode&, sdbusplus::bus::bus&)>;
+    sdbusplus::bus::bus&, const sdbusplus::message::object_path&,
+    const UniqueHwId&)>;
 
-IsItIsoHwInvPath itemInstance(const sdbusplus::message::object_path& objPath,
-                              const std::string& instance,
-                              const type::LocationCode& locCode,
-                              sdbusplus::bus::bus& bus);
+IsItIsoHwInvPath itemInstanceId(sdbusplus::bus::bus& bus,
+                                const sdbusplus::message::object_path& objPath,
+                                const UniqueHwId& instanceId);
 
-IsItIsoHwInvPath itemPrettyName(const sdbusplus::message::object_path& objPath,
-                                const std::string& instance,
-                                const type::LocationCode& locCode,
-                                sdbusplus::bus::bus& bus);
+IsItIsoHwInvPath itemPrettyName(sdbusplus::bus::bus& bus,
+                                const sdbusplus::message::object_path& objPath,
+                                const UniqueHwId& prettyName);
 
-IsItIsoHwInvPath itemLocationCode(
-    const sdbusplus::message::object_path& objPath, const std::string& instance,
-    const type::LocationCode& locCode, sdbusplus::bus::bus& bus);
+IsItIsoHwInvPath
+    itemLocationCode(sdbusplus::bus::bus& bus,
+                     const sdbusplus::message::object_path& objPath,
+                     const UniqueHwId& locCode);
 
 } // namespace inv_path_lookup_func
 
@@ -108,21 +110,6 @@ class IsolatableHWs
             };
 
             /**
-             * @brief ItemObjectName used to hold bmc inventory
-             *        item (hardware) object name that can be
-             *        used to get inventory object path.
-             *        This is helpful when getting inventory
-             *        item dbus object path alone to isolate.
-             */
-            struct ItemObjectName
-            {
-                std::string _name;
-                explicit ItemObjectName(const std::string& objName) :
-                    _name(objName)
-                {}
-            };
-
-            /**
              * @brief PhalPdbgClassName used to hold phal pdbg
              *        class name (which is actually available for
              *        hardwares which are present in phal cec device tree)
@@ -138,36 +125,25 @@ class IsolatableHWs
             };
 
             ItemInterfaceName _interfaceName;
-            ItemObjectName _itemObjectName;
             PhalPdbgClassName _pdbgClassName;
 
             HwId() = delete;
 
-            HwId(ItemInterfaceName ifaceName, ItemObjectName oName,
-                 PhalPdbgClassName pClassName) :
-                _interfaceName(ifaceName),
-                _itemObjectName(oName), _pdbgClassName(pClassName)
+            HwId(ItemInterfaceName ifaceName, PhalPdbgClassName pClassName) :
+                _interfaceName(ifaceName), _pdbgClassName(pClassName)
             {}
 
-            HwId(const std::string& ifaceName, const std::string& oName,
-                 const std::string& pClassName) :
+            HwId(const std::string& ifaceName, const std::string& pClassName) :
                 _interfaceName(ItemInterfaceName(ifaceName)),
-                _itemObjectName(ItemObjectName(oName)),
                 _pdbgClassName(PhalPdbgClassName(pClassName))
             {}
 
             explicit HwId(ItemInterfaceName ifaceName) :
-                _interfaceName(ifaceName), _itemObjectName(""),
-                _pdbgClassName("")
-            {}
-
-            explicit HwId(ItemObjectName oName) :
-                _interfaceName(""), _itemObjectName(oName), _pdbgClassName("")
+                _interfaceName(ifaceName), _pdbgClassName("")
             {}
 
             explicit HwId(PhalPdbgClassName pClassName) :
-                _interfaceName(""), _itemObjectName(""),
-                _pdbgClassName(pClassName)
+                _interfaceName(""), _pdbgClassName(pClassName)
             {}
 
             /**
@@ -180,11 +156,6 @@ class IsolatableHWs
                 if (!hwId._interfaceName._name.empty())
                 {
                     return hwId._interfaceName._name == _interfaceName._name;
-                }
-
-                if (!hwId._itemObjectName._name.empty())
-                {
-                    return hwId._itemObjectName._name == _itemObjectName._name;
                 }
 
                 if (!hwId._pdbgClassName._name.empty())
@@ -260,23 +231,8 @@ class IsolatableHWs
     std::map<HW_Details::HwId, HW_Details> _isolatableHWsList;
 
     /**
-     * @brief Helper function to segregate the instance name and id
-     *        from given hardware dbus object name.
-     *        Example: core0 -> std::pair<core, 0>
-     *
-     * @param[in] objName - hardware dbus object name to segregate into
-     *                      instance name and id
-     *
-     * @return pair<InstanceName, InstanceId> on success or
-     *         empty optional on failure
-     */
-    std::optional<
-        std::pair<IsolatableHWs::HW_Details::HwId::ItemObjectName, InstanceId>>
-        getInstanceInfo(const std::string& objName) const;
-
-    /**
-     * @brief Get the HwID based on given ItemInterfaceName or ItemObjectName
-     *        or PhalPdbgClassName.
+     * @brief Get the HwID based on given ItemInterfaceName or
+     *        PhalPdbgClassName.
      *
      * @param[in] id - The ID to find the HwID.
      *
