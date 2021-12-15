@@ -668,6 +668,65 @@ std::optional<std::vector<sdbusplus::message::object_path>>
     return listOfChildsInventoryPath;
 }
 
+std::optional<sdbusplus::message::object_path>
+    IsolatableHWs::getFRUInventoryPath(
+        const std::pair<LocationCode, InstanceId>& fruDetails,
+        const inv_path_lookup_func::LookupFuncForInvPath& fruInvPathLookupFunc)
+{
+    auto inventoryPathList = getInventoryPathsByLocCode(fruDetails.first);
+    if (!inventoryPathList.has_value())
+    {
+        return std::nullopt;
+    }
+
+    if (inventoryPathList->empty())
+    {
+        // The inventory object doesn't exist for the given location code.
+        log<level::ERR>(
+            fmt::format("The inventory object does not exist for the given "
+                        "location code [{}].",
+                        fruDetails.first)
+                .c_str());
+        return std::nullopt;
+    }
+    else if (inventoryPathList->size() == 1)
+    {
+        // Only one inventory object is exist for the given location code.
+        // For example, DIMM
+        return (*inventoryPathList)[0];
+    }
+    else
+    {
+        /**
+         * More than one inventory objects are exist for the given location code
+         * so use the given instance id to get the right inventory object.
+         *
+         * For example, two processor in the Dual-Chip-Module will have the
+         * same location code so the processor MRU_ID (aka instance id) is
+         * included in the inventory object segment to get the right inventory
+         * object.
+         */
+        inv_path_lookup_func::UniqueHwId fruInstId{fruDetails.second};
+
+        auto fruHwInvPath = std::find_if(
+            inventoryPathList->begin(), inventoryPathList->end(),
+            [&fruInstId, &fruInvPathLookupFunc, this](const auto& path) {
+                return fruInvPathLookupFunc(this->_bus, path, fruInstId);
+            });
+
+        if (fruHwInvPath == inventoryPathList->end())
+        {
+            log<level::ERR>(
+                fmt::format("The inventory object does not exist for "
+                            "the given location code [{}] and instance id [{}]",
+                            fruDetails.first, fruDetails.second)
+                    .c_str());
+            return std::nullopt;
+        }
+        return *fruHwInvPath;
+    }
+}
+
 std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
     const devtree::DevTreePhysPath& physicalPath)
 {
@@ -712,24 +771,10 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
         if (isolatedHwDetails->second._isItFRU)
         {
             auto isolatedHwInfo = devtree::getFRUDetails(*isolatedHwTgt);
-            inv_path_lookup_func::UniqueHwId isolateHwInstId{
-                isolatedHwInfo.second};
 
-            auto inventoryPathList =
-                getInventoryPathsByLocCode(isolatedHwInfo.first);
-            if (!inventoryPathList.has_value())
-            {
-                return std::nullopt;
-            }
-
-            auto isolateHwPath = std::find_if(
-                inventoryPathList->begin(), inventoryPathList->end(),
-                [&isolateHwInstId, &isolatedHwDetails, this](const auto& path) {
-                    return isolatedHwDetails->second._invPathFuncLookUp(
-                        this->_bus, path, isolateHwInstId);
-                });
-
-            if (isolateHwPath == inventoryPathList->end())
+            auto inventoryPath = getFRUInventoryPath(
+                isolatedHwInfo, isolatedHwDetails->second._invPathFuncLookUp);
+            if (!inventoryPath.has_value())
             {
                 log<level::ERR>(fmt::format("Failed to get inventory path for "
                                             "given device path [{}]",
@@ -738,7 +783,7 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
                 return std::nullopt;
             }
 
-            isolatedHwInventoryPath = *isolateHwPath;
+            isolatedHwInventoryPath = *inventoryPath;
         }
         else
         {
@@ -767,25 +812,10 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
             }
 
             auto parentFruHwInfo = devtree::getFRUDetails(*parentFruTgt);
-            inv_path_lookup_func::UniqueHwId parentFruHwInstId{
-                parentFruHwInfo.second};
 
-            auto parentFruInventoryPathList =
-                getInventoryPathsByLocCode(parentFruHwInfo.first);
-            if (!parentFruInventoryPathList.has_value())
-            {
-                return std::nullopt;
-            }
-
-            auto parentFruPath = std::find_if(
-                parentFruInventoryPathList->begin(),
-                parentFruInventoryPathList->end(),
-                [&parentFruHwInstId, &parentFruHwDetails,
-                 this](const auto& path) {
-                    return parentFruHwDetails->second._invPathFuncLookUp(
-                        this->_bus, path, parentFruHwInstId);
-                });
-            if (parentFruPath == parentFruInventoryPathList->end())
+            auto parentFruPath = getFRUInventoryPath(
+                parentFruHwInfo, parentFruHwDetails->second._invPathFuncLookUp);
+            if (!parentFruPath.has_value())
             {
                 log<level::ERR>(
                     fmt::format("Failed to get get parent fru inventory path "

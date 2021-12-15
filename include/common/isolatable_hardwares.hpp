@@ -320,6 +320,21 @@ class IsolatableHWs
         getChildsInventoryPath(
             const sdbusplus::message::object_path& parentObjPath,
             const std::string& interfaceName);
+
+    /**
+     * @brief Used to get the FRU inventory path by using the given
+     *        FRU details (location code and instance id)
+     *
+     * @param[in] fruDetails - The FRU details to get inventory path
+     * @param[in] fruInvPathLookupFunc - The lookup function to get inventory
+     *                                   path
+     *
+     * @return The inventory path of the given FRU on success
+     *         Empty optional on failure
+     */
+    std::optional<sdbusplus::message::object_path> getFRUInventoryPath(
+        const std::pair<LocationCode, InstanceId>& fruDetails,
+        const inv_path_lookup_func::LookupFuncForInvPath& fruInvPathLookupFunc);
 };
 
 } // namespace isolatable_hws
