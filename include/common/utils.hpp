@@ -189,5 +189,24 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
 std::optional<sdbusplus::message::object_path>
     getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid);
 
+/**
+ * @brief Helper function to get the instance id from the given
+ *        D-Bus object path segment.
+ *        Example: core0 -> 0
+ *
+ * @param[in] objPathSegment - The D-Bus object path segment to get
+ *                             the instance id
+ *
+ * @return The instance id on success
+ *         Empty optional on failure
+ *
+ * @note This API will return the invalid instance id if the given object
+ *       path segment doesn't contain (any digit) the instance id because
+ *       some of the D-Bus objects path segment doesn't have instance id.
+ *       For example, TPM inventory object path.
+ */
+std::optional<type::InstanceId>
+    getInstanceId(const std::string& objPathSegment);
+
 } // namespace utils
 } // namespace hw_isolation

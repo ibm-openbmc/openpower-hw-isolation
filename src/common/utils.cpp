@@ -202,5 +202,36 @@ std::optional<sdbusplus::message::object_path>
     }
 }
 
+std::optional<type::InstanceId> getInstanceId(const std::string& objPathSegment)
+{
+    try
+    {
+        /**
+         * FIXME: The assumption is, the instance id (numberic value) will be
+         *        always added at last in the object path segment
+         *        for the OpenBMC.
+         */
+        auto it =
+            std::find_if_not(objPathSegment.crbegin(), objPathSegment.crend(),
+                             [](const char chr) { return std::isdigit(chr); });
+
+        type::InstanceId hwInstanceId{type::Invalid_InstId};
+        if (it != objPathSegment.crbegin())
+        {
+            hwInstanceId = std::stoi(objPathSegment.substr(
+                std::distance(it, objPathSegment.crend())));
+        }
+        return hwInstanceId;
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception [{}] to get instance id from "
+                                    "the given D-Bus object path segment [{}]",
+                                    e.what(), objPathSegment)
+                            .c_str());
+    }
+    return std::nullopt;
+}
+
 } // namespace utils
 } // namespace hw_isolation
