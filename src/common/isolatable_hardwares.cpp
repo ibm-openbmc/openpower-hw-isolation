@@ -157,6 +157,13 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
          IsolatableHWs::HW_Details(
              !ItIsFRU, dimmHwId, devtree::lookup_func::pdbgIndex,
              inv_path_lookup_func::itemPrettyName, "DDR Memory Port")},
+
+        {IsolatableHWs::HW_Details::HwId(CommonInventoryItemIface,
+                                         "generic_i2c_device"),
+         IsolatableHWs::HW_Details(!ItIsFRU, dimmHwId,
+                                   devtree::lookup_func::pdbgIndex,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Onboard Memory Power Control Device")},
     };
 }
 
@@ -550,16 +557,28 @@ std::optional<struct pdbg_target*>
     std::string fruUnitPdbgClass{pdbg_target_class_name(devTreeTgt)};
 
     struct pdbg_target* parentFruTarget = nullptr;
-    if ((fruUnitPdbgClass == "ocmb") || (fruUnitPdbgClass == "mem_port"))
+    if ((fruUnitPdbgClass == "ocmb") || (fruUnitPdbgClass == "mem_port") ||
+        (fruUnitPdbgClass == "generic_i2c_device"))
     {
         /**
-         * FIXME: The assumption is, dimm is parent fru for "ocmb" and
-         *        "mem_port" and each "ocmb" or "mem_port" will have one
-         *        "dimm" so if something is changed then need to fix
-         *        this logic.
+         * FIXME: The assumption is, dimm is parent fru for "ocmb", "mem_port",
+         *        and "generic_i2c_device" units and those units
+         *        will have only one "dimm" so if something is changed then,
+         *        need to fix this logic.
          * @note  In phal cec device tree dimm is placed under ocmb->mem_port
          *        based on dimm pervasive path.
          */
+        if ((fruUnitPdbgClass == "generic_i2c_device"))
+        {
+            /**
+             * The "generic_i2c_device" unit is placed under ocmb
+             * but, dimm is placed under the ocmb so, we need to get
+             * the parent ocmb for the given "generic_i2c_device"
+             * unit to get the dimm fru target.
+             */
+            devTreeTgt = pdbg_target_parent("ocmb", devTreeTgt);
+        }
+
         auto dimmCount = 0;
         struct pdbg_target* lastDimmTgt = nullptr;
         pdbg_for_each_target("dimm", devTreeTgt, lastDimmTgt)
