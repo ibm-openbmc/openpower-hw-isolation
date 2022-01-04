@@ -164,6 +164,12 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
                                    devtree::lookup_func::pdbgIndex,
                                    inv_path_lookup_func::itemPrettyName,
                                    "Onboard Memory Power Control Device")},
+
+        {IsolatableHWs::HW_Details::HwId(CommonInventoryItemIface, "pmic"),
+         IsolatableHWs::HW_Details(!ItIsFRU, dimmHwId,
+                                   devtree::lookup_func::pdbgIndex,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Onboard Memory Power Management IC")},
     };
 }
 
@@ -558,23 +564,25 @@ std::optional<struct pdbg_target*>
 
     struct pdbg_target* parentFruTarget = nullptr;
     if ((fruUnitPdbgClass == "ocmb") || (fruUnitPdbgClass == "mem_port") ||
-        (fruUnitPdbgClass == "generic_i2c_device"))
+        (fruUnitPdbgClass == "generic_i2c_device") ||
+        (fruUnitPdbgClass == "pmic"))
     {
         /**
          * FIXME: The assumption is, dimm is parent fru for "ocmb", "mem_port",
-         *        and "generic_i2c_device" units and those units
+         *        "generic_i2c_device", and "pmic" units and those units
          *        will have only one "dimm" so if something is changed then,
          *        need to fix this logic.
          * @note  In phal cec device tree dimm is placed under ocmb->mem_port
          *        based on dimm pervasive path.
          */
-        if ((fruUnitPdbgClass == "generic_i2c_device"))
+        if ((fruUnitPdbgClass == "generic_i2c_device") ||
+            (fruUnitPdbgClass == "pmic"))
         {
             /**
-             * The "generic_i2c_device" unit is placed under ocmb
+             * The "generic_i2c_device" and "pmic" units are placed under ocmb
              * but, dimm is placed under the ocmb so, we need to get
-             * the parent ocmb for the given "generic_i2c_device"
-             * unit to get the dimm fru target.
+             * the parent ocmb for the given "generic_i2c_device" and "pmic"
+             * units to get the dimm fru target.
              */
             devTreeTgt = pdbg_target_parent("ocmb", devTreeTgt);
         }
