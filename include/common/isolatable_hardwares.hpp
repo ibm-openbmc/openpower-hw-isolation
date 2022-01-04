@@ -335,6 +335,33 @@ class IsolatableHWs
     std::optional<sdbusplus::message::object_path> getFRUInventoryPath(
         const std::pair<LocationCode, InstanceId>& fruDetails,
         const inv_path_lookup_func::LookupFuncForInvPath& fruInvPathLookupFunc);
+
+    /**
+     * @brief Used to get the clock parent fru inventory object path
+     *
+     * @param[in] clkTgt - The clock target to get parent fru path
+     *
+     * @return The clock parent fru inventory object path on success
+     *         Empty optional on failure
+     *
+     * @note The oscrefclk parent fru is not modelled in the phal cec
+     *       device tree so defining the temporary workaround in this API
+     *       instead of defining the isolatable hardwares list.
+     */
+    std::optional<sdbusplus::message::object_path>
+        getClkParentFruObjPath(struct pdbg_target* clkTgt);
+
+    /**
+     * @brief Used to get the parent fru inventory object path of the given
+     *        child target (aka phal cec device tree target)
+     *
+     * @param[in] childTgt - The child target to get parent fru path
+     *
+     * @return The parent fru inventory object path on success
+     *         Empty optional on failure
+     */
+    std::optional<sdbusplus::message::object_path>
+        getParentFruObjPath(struct pdbg_target* childTgt);
 };
 
 } // namespace isolatable_hws

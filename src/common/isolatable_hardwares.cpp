@@ -170,6 +170,19 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
                                    devtree::lookup_func::pdbgIndex,
                                    inv_path_lookup_func::itemPrettyName,
                                    "Onboard Memory Power Management IC")},
+
+        // Motherboard subunits
+
+        /**
+         * The oscrefclk parent fru is not modelled in the phal cec device tree
+         * so using the temporary workaround (refer getClkParentFruObjPath())
+         * instead of defining the isolatable hardwares list.
+         */
+        {IsolatableHWs::HW_Details::HwId(CommonInventoryItemIface, "oscrefclk"),
+         IsolatableHWs::HW_Details(!ItIsFRU, emptyHwId,
+                                   devtree::lookup_func::pdbgIndex,
+                                   inv_path_lookup_func::itemPrettyName,
+                                   "Oscillator Reference Clock")},
     };
 }
 
@@ -740,6 +753,119 @@ std::optional<sdbusplus::message::object_path>
     }
 }
 
+std::optional<sdbusplus::message::object_path>
+    IsolatableHWs::getClkParentFruObjPath(struct pdbg_target* clkTgt)
+{
+    auto clkTgtDevTreePath{pdbg_target_path(clkTgt)};
+
+    constexpr auto MotherboardIface =
+        "xyz.openbmc_project.Inventory.Item.Board.Motherboard";
+    auto parentFruPath = getChildsInventoryPath(
+        std::string("/xyz/openbmc_project/inventory"), MotherboardIface);
+
+    if (!parentFruPath.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get the parent fru [{}] inventory path "
+                        "for the given device path [{}]",
+                        MotherboardIface, clkTgtDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+    else if (parentFruPath->empty())
+    {
+        log<level::ERR>(
+            fmt::format("The parent fru [{}] inventory object is not exist "
+                        "for the given device path [{}]",
+                        MotherboardIface, clkTgtDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+    else if (parentFruPath->size() > 1)
+    {
+        log<level::ERR>(
+            fmt::format("More than one parent fru [{}] inventory object is "
+                        "exists for the given device path [{}]",
+                        MotherboardIface, clkTgtDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+
+    return (*parentFruPath)[0];
+}
+
+std::optional<sdbusplus::message::object_path>
+    IsolatableHWs::getParentFruObjPath(struct pdbg_target* childTgt)
+{
+    if (childTgt == nullptr)
+    {
+        log<level::ERR>(
+            "Given pdbg target is invalid, failed to get parent fru path");
+        return std::nullopt;
+    }
+
+    auto childTgtDevTreePath{pdbg_target_path(childTgt)};
+
+    auto pdbgTgtClass{pdbg_target_class_name(childTgt)};
+    if (pdbgTgtClass == nullptr)
+    {
+        log<level::ERR>(
+            fmt::format("The given hardware [{}] pdbg target class is missing, "
+                        "please make sure hardware unit is added in the pdbg",
+                        childTgtDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+
+    /**
+     * Temporary workaround to get the parent fru path for the oscrefclk
+     * because the oscrefclk parent fru is not modelled in the phal
+     * cec device tree.
+     */
+    if (std::strcmp(pdbgTgtClass, "oscrefclk") == 0)
+    {
+        return getClkParentFruObjPath(childTgt);
+    }
+
+    auto parentFruTgt = getParentFruPhalDevTreeTgt(childTgt);
+    if (!parentFruTgt.has_value())
+    {
+        return std::nullopt;
+    }
+
+    std::string parentFruTgtPdbgClass{pdbg_target_class_name(*parentFruTgt)};
+    auto parentFruHwId = IsolatableHWs::HW_Details::HwId{
+        IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
+            parentFruTgtPdbgClass)};
+
+    auto parentFruHwDetails = getIsotableHWDetails(parentFruHwId);
+    if (!parentFruHwDetails.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Isolated hardware [{}] parent fru pdbg class [{}] is "
+                        "not found in the isolatable hardware list",
+                        childTgtDevTreePath, parentFruTgtPdbgClass)
+                .c_str());
+        return std::nullopt;
+    }
+
+    auto parentFruHwInfo = devtree::getFRUDetails(*parentFruTgt);
+
+    auto parentFruPath = getFRUInventoryPath(
+        parentFruHwInfo, parentFruHwDetails->second._invPathFuncLookUp);
+    if (!parentFruPath.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get get parent fru inventory path "
+                        "for given device path [{}]",
+                        childTgtDevTreePath)
+                .c_str());
+        return std::nullopt;
+    }
+
+    return parentFruPath;
+}
+
 std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
     const devtree::DevTreePhysPath& physicalPath)
 {
@@ -800,41 +926,9 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
         }
         else
         {
-            auto parentFruTgt = getParentFruPhalDevTreeTgt(*isolatedHwTgt);
-            if (!parentFruTgt.has_value())
-            {
-                return std::nullopt;
-            }
-
-            std::string parentFruTgtPdbgClass =
-                pdbg_target_class_name(*parentFruTgt);
-            auto parentFruHwId = IsolatableHWs::HW_Details::HwId{
-                IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
-                    parentFruTgtPdbgClass)};
-
-            auto parentFruHwDetails = getIsotableHWDetails(parentFruHwId);
-            if (!parentFruHwDetails.has_value())
-            {
-                log<level::ERR>(
-                    fmt::format(
-                        "Isolated hardware [{}] parent fru pdbg "
-                        "class [{}] is not found in isolatable hardware list",
-                        isolatedHwTgtDevTreePath, parentFruTgtPdbgClass)
-                        .c_str());
-                return std::nullopt;
-            }
-
-            auto parentFruHwInfo = devtree::getFRUDetails(*parentFruTgt);
-
-            auto parentFruPath = getFRUInventoryPath(
-                parentFruHwInfo, parentFruHwDetails->second._invPathFuncLookUp);
+            auto parentFruPath = getParentFruObjPath(*isolatedHwTgt);
             if (!parentFruPath.has_value())
             {
-                log<level::ERR>(
-                    fmt::format("Failed to get get parent fru inventory path "
-                                "for given device path [{}]",
-                                isolatedHwTgtDevTreePath)
-                        .c_str());
                 return std::nullopt;
             }
 
