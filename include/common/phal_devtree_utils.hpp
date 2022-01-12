@@ -103,6 +103,17 @@ DevTreePhysPath
     convertEntityPathIntoRawData(const openpower_guard::EntityPath& entityPath);
 
 /**
+ * @brief Helper function to check whether given core target is extended
+ *        cache only core or not.
+ *
+ * @param[in] coreTgt - The core target to check ECO mode
+ *
+ * @return True if the given core target is in the ECO mode
+ *         False otherwise
+ */
+bool isECOcore(struct pdbg_target* coreTgt);
+
+/**
  * @brief Used to add functions that will use to get to know
  *        whether the given target (aka device tree node) can
  *        be used to get the physical path of expected hardware.

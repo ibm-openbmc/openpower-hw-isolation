@@ -74,6 +74,11 @@ IsolatableHWs::IsolatableHWs(sdbusplus::bus::bus& bus) : _bus(bus)
                                    devtree::lookup_func::chipUnitPos,
                                    inv_path_lookup_func::itemInstanceId, "")},
 
+        {IsolatableHWs::HW_Details::HwId(CommonInventoryItemIface, "core"),
+         IsolatableHWs::HW_Details(
+             !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
+             inv_path_lookup_func::itemPrettyName, "Cache-Only Core")},
+
         {IsolatableHWs::HW_Details::HwId(CommonInventoryItemIface, "mc"),
          IsolatableHWs::HW_Details(
              !ItIsFRU, processorHwId, devtree::lookup_func::chipUnitPos,
@@ -194,6 +199,24 @@ std::optional<
     auto it = std::find_if(
         _isolatableHWsList.begin(), _isolatableHWsList.end(),
         [&id](const auto& isolatableHw) { return isolatableHw.first == id; });
+
+    if (it != _isolatableHWsList.end())
+    {
+        return *it;
+    }
+    return std::nullopt;
+}
+
+std::optional<
+    std::pair<IsolatableHWs::HW_Details::HwId, IsolatableHWs::HW_Details>>
+    IsolatableHWs::getIsotableHWDetailsByPrettyName(
+        const std::string& prettyName) const
+{
+    auto it =
+        std::find_if(_isolatableHWsList.begin(), _isolatableHWsList.end(),
+                     [&prettyName](const auto& isolatableHw) {
+                         return isolatableHw.second._prettyName == prettyName;
+                     });
 
     if (it != _isolatableHWsList.end())
     {
@@ -891,11 +914,30 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
         }
         std::string isolatedHwPdbgClass{pdbgTgtClass};
 
+        std::optional<std::pair<IsolatableHWs::HW_Details::HwId,
+                                IsolatableHWs::HW_Details>>
+            isolatedHwDetails;
         auto isolatedHwId = IsolatableHWs::HW_Details::HwId{
             IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
                 isolatedHwPdbgClass)};
 
-        auto isolatedHwDetails = getIsotableHWDetails(isolatedHwId);
+        if (isolatedHwId._pdbgClassName._name == "core")
+        {
+            if (devtree::isECOcore(*isolatedHwTgt))
+            {
+                isolatedHwDetails =
+                    getIsotableHWDetailsByPrettyName("Cache-Only Core");
+            }
+            else
+            {
+                isolatedHwDetails = getIsotableHWDetails(isolatedHwId);
+            }
+        }
+        else
+        {
+            isolatedHwDetails = getIsotableHWDetails(isolatedHwId);
+        }
+
         if (!isolatedHwDetails.has_value())
         {
             log<level::ERR>(

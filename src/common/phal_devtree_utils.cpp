@@ -336,6 +336,29 @@ DevTreePhysPath
     return rawData;
 }
 
+bool isECOcore(struct pdbg_target* coreTgt)
+{
+    ATTR_ECO_MODE_Type ecoMode;
+    if (DT_GET_PROP(ATTR_ECO_MODE, coreTgt, ecoMode))
+    {
+        log<level::ERR>(
+            fmt::format(
+                "Failed to get ATTR_ECO_MODE from the given core target [{}]",
+                pdbg_target_path(coreTgt))
+                .c_str());
+        return false;
+    }
+
+    if (ecoMode == ENUM_ATTR_ECO_MODE_ENABLED)
+    {
+        return true;
+    }
+    else
+    {
+        return false;
+    }
+}
+
 namespace lookup_func
 {
 CanGetPhysPath mruId(struct pdbg_target* pdbgTgt, InstanceId instanceId,

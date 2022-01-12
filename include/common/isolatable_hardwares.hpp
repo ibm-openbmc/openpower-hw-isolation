@@ -228,7 +228,7 @@ class IsolatableHWs
     /**
      * @brief The list of isolatable hardwares
      */
-    std::map<HW_Details::HwId, HW_Details> _isolatableHWsList;
+    std::multimap<HW_Details::HwId, HW_Details> _isolatableHWsList;
 
     /**
      * @brief Get the HwID based on given ItemInterfaceName or
@@ -241,6 +241,17 @@ class IsolatableHWs
      */
     std::optional<std::pair<HW_Details::HwId, HW_Details>>
         getIsotableHWDetails(const HW_Details::HwId& id) const;
+
+    /**
+     * @brief Get the HwID based on the given PrettyName.
+     *
+     * @param[in] prettyName - The prettyName to find the HwID.
+     *
+     * @return the hardware details for the given prettyName
+     *         or an empty optional if not found.
+     */
+    std::optional<std::pair<HW_Details::HwId, HW_Details>>
+        getIsotableHWDetailsByPrettyName(const std::string& prettyName) const;
 
     /**
      * @brief Get the HwID based on the given D-Bus object path.
