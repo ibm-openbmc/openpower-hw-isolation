@@ -124,6 +124,62 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
     return std::nullopt;
 }
 
+std::pair<bool, sdbusplus::message::object_path> Manager::updateEntry(
+    const entry::EntryRecordId& recordId, const entry::EntrySeverity& severity,
+    const std::string& isolatedHwDbusObjPath, const std::string& bmcErrorLog,
+    const openpower_guard::EntityPath& entityPath)
+{
+    auto isolatedHwIt = std::find_if(
+        _isolatedHardwares.begin(), _isolatedHardwares.end(),
+        [recordId, entityPath](const auto& isolatedHw) {
+            return ((isolatedHw.second->getEntityPath() == entityPath) &&
+                    (isolatedHw.second->getEntryRecId() == recordId) &&
+                    (!isolatedHw.second->resolved()));
+        });
+
+    if (isolatedHwIt == _isolatedHardwares.end())
+    {
+        // D-Bus entry does not exist
+        return std::make_pair(false, std::string());
+    }
+
+    // Add association for isolated hardware inventory path
+    // Note: Association forward and reverse type are defined as per
+    // hardware isolation design document (aka guard) and hardware isolation
+    // entry dbus interface document for hardware and error object path
+    type::AsscDefFwdType isolateHwFwdType("isolated_hw");
+    type::AsscDefRevType isolatedHwRevType("isolated_hw_entry");
+    type::AssociationDef associationDeftoHw;
+    associationDeftoHw.push_back(std::make_tuple(
+        isolateHwFwdType, isolatedHwRevType, isolatedHwDbusObjPath));
+
+    // Add errog log as Association if given
+    if (!bmcErrorLog.empty())
+    {
+        type::AsscDefFwdType bmcErrorLogFwdType("isolated_hw_errorlog");
+        type::AsscDefRevType bmcErrorLogRevType("isolated_hw_entry");
+        associationDeftoHw.push_back(std::make_tuple(
+            bmcErrorLogFwdType, bmcErrorLogRevType, bmcErrorLog));
+    }
+
+    // Existing record might be overridden in the libguard during
+    // creation if that's meets certain override conditions
+    if (isolatedHwIt->second->severity() != severity)
+    {
+        isolatedHwIt->second->severity(severity);
+    }
+
+    if (isolatedHwIt->second->associations() != associationDeftoHw)
+    {
+        isolatedHwIt->second->associations(associationDeftoHw);
+    }
+
+    auto entryObjPath = fs::path(HW_ISOLATION_ENTRY_OBJPATH) /
+                        std::to_string(isolatedHwIt->first);
+
+    return std::make_pair(true, entryObjPath.string());
+}
+
 void Manager::isHwIsolationAllowed(const entry::EntrySeverity& severity)
 {
     // Make sure the hardware isolation setting is enabled or not
@@ -184,15 +240,24 @@ sdbusplus::message::object_path Manager::create(
     auto guardRecord =
         openpower_guard::create(devTreePhysicalPath->data(), 0, *guardType);
 
-    auto entryPath =
-        createEntry(guardRecord->recordId, false, severity, isolateHardware.str,
-                    "", true, guardRecord->targetId);
-
-    if (!entryPath.has_value())
+    if (auto ret = updateEntry(guardRecord->recordId, severity,
+                               isolateHardware.str, "", guardRecord->targetId);
+        ret.first == true)
     {
-        throw type::CommonError::InternalFailure();
+        return ret.second;
     }
-    return *entryPath;
+    else
+    {
+        auto entryPath =
+            createEntry(guardRecord->recordId, false, severity,
+                        isolateHardware.str, "", true, guardRecord->targetId);
+
+        if (!entryPath.has_value())
+        {
+            throw type::CommonError::InternalFailure();
+        }
+        return *entryPath;
+    }
 }
 
 sdbusplus::message::object_path Manager::createWithErrorLog(
@@ -234,15 +299,25 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
     auto guardRecord =
         openpower_guard::create(devTreePhysicalPath->data(), *eId, *guardType);
 
-    auto entryPath =
-        createEntry(guardRecord->recordId, false, severity, isolateHardware.str,
-                    bmcErrorLog.str, true, guardRecord->targetId);
-
-    if (!entryPath.has_value())
+    if (auto ret =
+            updateEntry(guardRecord->recordId, severity, isolateHardware.str,
+                        bmcErrorLog.str, guardRecord->targetId);
+        ret.first == true)
     {
-        throw type::CommonError::InternalFailure();
+        return ret.second;
     }
-    return *entryPath;
+    else
+    {
+        auto entryPath = createEntry(guardRecord->recordId, false, severity,
+                                     isolateHardware.str, bmcErrorLog.str, true,
+                                     guardRecord->targetId);
+
+        if (!entryPath.has_value())
+        {
+            throw type::CommonError::InternalFailure();
+        }
+        return *entryPath;
+    }
 }
 
 void Manager::deleteAll()
@@ -359,6 +434,88 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
     }
 }
 
+void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
+                                   IsolatedHardwares::iterator& entryIt)
+{
+    auto entityPathRawData =
+        devtree::convertEntityPathIntoRawData(record.targetId);
+    std::stringstream ss;
+    std::for_each(entityPathRawData.begin(), entityPathRawData.end(),
+                  [&ss](const auto& ele) {
+                      ss << std::setw(2) << std::setfill('0') << std::hex
+                         << (int)ele << " ";
+                  });
+
+    auto isolatedHwInventoryPath =
+        _isolatableHWs.getInventoryPath(entityPathRawData);
+
+    if (!isolatedHwInventoryPath.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Skipping to restore a given isolated "
+                        "hardware [{}] : Due to failure to get inventory path",
+                        ss.str())
+                .c_str());
+        return;
+    }
+
+    auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
+
+    if (!bmcErrorLogPath.has_value())
+    {
+        log<level::ERR>(
+            fmt::format(
+                "Skipping to restore a given isolated "
+                "hardware [{}] : Due to failure to get BMC error log path "
+                "by isolated hardware EID (aka PEL ID) [{}]",
+                ss.str(), record.elogId)
+                .c_str());
+        return;
+    }
+
+    auto entrySeverity = entry::utils::getEntrySeverityType(
+        static_cast<openpower_guard::GardType>(record.errType));
+    if (!entrySeverity.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Skipping to restore a given isolated "
+                        "hardware [{}] : Due to failure to to get BMC "
+                        "EntrySeverity by isolated hardware GardType [{}]",
+                        ss.str(), record.errType)
+                .c_str());
+        return;
+    }
+
+    // Add association for isolated hardware inventory path
+    // Note: Association forward and reverse type are defined as per
+    // hardware isolation design document (aka guard) and hardware isolation
+    // entry dbus interface document for hardware and error object path
+    type::AsscDefFwdType isolateHwFwdType("isolated_hw");
+    type::AsscDefRevType isolatedHwRevType("isolated_hw_entry");
+    type::AssociationDef associationDeftoHw;
+    associationDeftoHw.push_back(std::make_tuple(
+        isolateHwFwdType, isolatedHwRevType, *isolatedHwInventoryPath));
+
+    // Add errog log as Association if given
+    if (!bmcErrorLogPath->str.empty())
+    {
+        type::AsscDefFwdType bmcErrorLogFwdType("isolated_hw_errorlog");
+        type::AsscDefRevType bmcErrorLogRevType("isolated_hw_entry");
+        associationDeftoHw.push_back(std::make_tuple(
+            bmcErrorLogFwdType, bmcErrorLogRevType, *bmcErrorLogPath));
+    }
+
+    if (entryIt->second->severity() != entrySeverity)
+    {
+        entryIt->second->severity(*entrySeverity);
+    }
+
+    if (entryIt->second->associations() != associationDeftoHw)
+    {
+        entryIt->second->associations(associationDeftoHw);
+    }
+}
+
 void Manager::restore()
 {
     openpower_guard::GuardRecords records = openpower_guard::getAll();
@@ -419,11 +576,16 @@ void Manager::handleHostIsolatedHardwares()
         {
             this->createEntryForRecord(record);
         }
-        // Update Resolved property if a record is resolved otherwise skip
-        // the record since it is already exist in isolated hardware entries.
+        // Update Resolved property if a record is resolved.
         else if (record.recordId == 0xFFFFFFFF)
         {
             isolatedHwIt->second->resolved(true);
+        }
+        else
+        {
+            // Existing record might be overridden in the libguard during
+            // creation if that's meets certain override conditions
+            updateEntryForRecord(record, isolatedHwIt);
         }
     });
 }
@@ -471,15 +633,25 @@ sdbusplus::message::object_path Manager::createWithEntityPath(
     auto guardRecord =
         openpower_guard::create(entityPath.data(), *eId, *guardType);
 
-    auto entryPath = createEntry(guardRecord->recordId, false, severity,
-                                 isolateHwInventoryPath->str, bmcErrorLog.str,
-                                 true, guardRecord->targetId);
-
-    if (!entryPath.has_value())
+    if (auto ret = updateEntry(guardRecord->recordId, severity,
+                               isolateHwInventoryPath->str, bmcErrorLog.str,
+                               guardRecord->targetId);
+        ret.first == true)
     {
-        throw type::CommonError::InternalFailure();
+        return ret.second;
     }
-    return *entryPath;
+    else
+    {
+        auto entryPath = createEntry(
+            guardRecord->recordId, false, severity, isolateHwInventoryPath->str,
+            bmcErrorLog.str, true, guardRecord->targetId);
+
+        if (!entryPath.has_value())
+        {
+            throw type::CommonError::InternalFailure();
+        }
+        return *entryPath;
+    }
 }
 
 std::optional<std::tuple<entry::EntrySeverity, entry::EntryErrLogPath>>

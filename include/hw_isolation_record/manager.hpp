@@ -209,6 +209,27 @@ class Manager :
                     const openpower_guard::EntityPath& entityPath);
 
     /**
+     * @brief Update a entry dbus object for isolated hardware if exists
+     *
+     * @param[in] recordId - the isolated hardware record id
+     * @param[in] severity - the severity of hardware isolation
+     * @param[in] isolatedHwDbusObjPath - the isolated hardware D-Bus object
+     *                                    path
+     * @param[in] bmcErrorLog - The error log which caused the hardware
+     *                          isolation
+     * @param[in] entityPath - the isolated hardware entity path
+     *
+     * @return pair<true, object_path> on success
+     *         pair<false, ""> on failure
+     */
+    std::pair<bool, sdbusplus::message::object_path>
+        updateEntry(const entry::EntryRecordId& recordId,
+                    const entry::EntrySeverity& severity,
+                    const std::string& isolatedHwDbusObjPath,
+                    const std::string& bmcErrorLog,
+                    const openpower_guard::EntityPath& entityPath);
+
+    /**
      * @brief Used to get to know whether hardware isolation is allowed
      *
      * @param[in] severity - the severity of hardware isolation
@@ -231,6 +252,22 @@ class Manager :
      *       for all isolated hardware that is stored in the preserved location.
      */
     void createEntryForRecord(const openpower_guard::GuardRecord& record);
+
+    /**
+     * @brief Update the given dbus entry object for isolated hardware record
+     *
+     * @param[in] record - The isolated hardware record
+     * @param[out] entryIt - The dbus entry object to update
+     *
+     * @return NULL on success
+     *
+     * @note The function will skip given isolated hardware to update
+     *       dbus entry if any failure since this is restoring mechanism
+     *       so the hardware isolation application need to update dbus entries
+     *       for all isolated hardware that is stored in the preserved location.
+     */
+    void updateEntryForRecord(const openpower_guard::GuardRecord& record,
+                              IsolatedHardwares::iterator& entryIt);
 };
 
 } // namespace record
