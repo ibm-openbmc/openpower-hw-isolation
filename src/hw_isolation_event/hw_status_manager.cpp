@@ -275,9 +275,13 @@ void Manager::restoreHardwaresStatusEvent()
                                  hwasState.functional)
                         {
                             /**
-                             * Event is not required since the hardware
-                             * isolation record is not exist and functional.
+                             * Event is not required and update "Enabled"
+                             * D-Bus property of the hardware because
+                             * the hardware isolation record is not exist and
+                             * functional.
                              */
+                            hw_isolation::utils::setEnabledProperty(
+                                _bus, hwInventoryPath->str, true);
                             continue;
                         }
                         else if ((hwasState.deconfiguredByEid &

@@ -44,16 +44,14 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
     this->emit_object_added();
 }
 
-void Entry::delete_()
+void Entry::resolveEntry(bool clearRecord)
 {
     if (!resolved())
     {
-        if (!hw_isolation::utils::isHwDeisolationAllowed(_bus))
+        if (clearRecord)
         {
-            throw type::CommonError::NotAllowed();
+            openpower_guard::clear(_entryRecordId);
         }
-
-        openpower_guard::clear(_entryRecordId);
         resolved(true);
         for (auto& assoc : associations())
         {
@@ -65,6 +63,15 @@ void Entry::delete_()
             }
         }
     }
+}
+
+void Entry::delete_()
+{
+    if (!hw_isolation::utils::isHwDeisolationAllowed(_bus))
+    {
+        throw type::CommonError::NotAllowed();
+    }
+    resolveEntry();
 }
 
 openpower_guard::EntityPath Entry::getEntityPath() const

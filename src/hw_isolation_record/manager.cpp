@@ -579,10 +579,11 @@ void Manager::handleHostIsolatedHardwares()
         {
             this->createEntryForRecord(record);
         }
-        // Update Resolved property if a record is resolved.
         else if (record.recordId == 0xFFFFFFFF)
         {
-            isolatedHwIt->second->resolved(true);
+            // Update Resolved and Enabled properties respectively
+            // in the hardware isolation entry and inventory D-Bus objects
+            isolatedHwIt->second->resolveEntry(false);
         }
         else
         {

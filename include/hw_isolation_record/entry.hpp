@@ -81,10 +81,22 @@ class Entry :
           const openpower_guard::EntityPath& entityPath);
 
     /**
+     * @brief Mark this object as resolved
+     *
+     * @param[in] clearRecord - use to decide whether want to clear
+     *                          record from their preserved file.
+     *                          By default, it will clear record.
+     * @return NULL
+     *
+     * @note This function just resolve the entry, won't check
+     *       whether resolve operation is allowed or not like "delete_()".
+     */
+    void resolveEntry(bool clearRecord = true);
+
+    /**
      *  @brief Mark this object as resolved
      *
      *  @return NULL
-     *
      */
     void delete_() override;
 
