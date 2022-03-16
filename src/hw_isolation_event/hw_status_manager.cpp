@@ -253,23 +253,47 @@ void Manager::restoreHardwaresStatusEvent()
                         {
                             if (hwasState.functional)
                             {
-                                /**
-                                 * Event is not required since the hardware
-                                 * isolation record is exist and not applied
-                                 * so far.
-                                 */
-                                continue;
+                                if (hwasState.deconfiguredByEid ==
+                                    openpower_hw_status::DeconfiguredByReason::
+                                        CONFIGURED_BY_RESOURCE_RECOVERY)
+                                {
+                                    /**
+                                     * Event is required since the hardware is
+                                     * recovered even thats requested to
+                                     * isolate.
+                                     */
+                                    auto dfgReason = openpower_hw_status::
+                                        convertDeconfiguredByReasonFromEnum(
+                                            static_cast<
+                                                openpower_hw_status::
+                                                    DeconfiguredByReason>(
+                                                hwasState.deconfiguredByEid));
+                                    eventMsg = std::get<0>(dfgReason);
+                                    eventSeverity = std::get<1>(dfgReason);
+                                }
+                                else
+                                {
+                                    /**
+                                     * Event is not required since the hardware
+                                     * isolation record is exist and not applied
+                                     * so far.
+                                     */
+                                    continue;
+                                }
                             }
+                            else
+                            {
+                                // Error log might be present or not in the
+                                // record.
+                                eventErrLogPath =
+                                    std::get<1>(*isolatedhwRecordInfo);
 
-                            // Error log might be present or not in the record.
-                            eventErrLogPath =
-                                std::get<1>(*isolatedhwRecordInfo);
+                                auto hwStatusInfo = getIsolatedHwStatusInfo(
+                                    std::get<0>(*isolatedhwRecordInfo));
 
-                            auto hwStatusInfo = getIsolatedHwStatusInfo(
-                                std::get<0>(*isolatedhwRecordInfo));
-
-                            eventMsg = std::get<0>(hwStatusInfo);
-                            eventSeverity = std::get<1>(hwStatusInfo);
+                                eventMsg = std::get<0>(hwStatusInfo);
+                                eventSeverity = std::get<1>(hwStatusInfo);
+                            }
                         }
                         else if (!isolatedhwRecordInfo.has_value() &&
                                  hwasState.functional)
