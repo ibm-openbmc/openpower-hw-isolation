@@ -67,10 +67,9 @@ void Entry::resolveEntry(bool clearRecord)
 
 void Entry::delete_()
 {
-    if (!hw_isolation::utils::isHwDeisolationAllowed(_bus))
-    {
-        throw type::CommonError::NotAllowed();
-    }
+    // throws exception if not allowed
+    hw_isolation::utils::isHwDeisolationAllowed(_bus);
+
     resolveEntry();
 }
 

@@ -58,7 +58,7 @@ namespace HardwareIsolationError =
     }                                                                          \
     catch (libguard::exception::GuardFileOverFlowed & e)                       \
     {                                                                          \
-        throw type::CommonError::NotAllowed();                                 \
+        throw type::CommonError::TooManyResources();                           \
     }
 
 std::optional<GuardRecord> create(const EntityPath& entityPath,

@@ -88,7 +88,7 @@ bool isHwIosolationSettingEnabled(sdbusplus::bus::bus& bus)
     }
 }
 
-bool isHwDeisolationAllowed(sdbusplus::bus::bus& bus)
+void isHwDeisolationAllowed(sdbusplus::bus::bus& bus)
 {
     // Make sure the hardware isolation setting is enabled or not
     if (!isHwIosolationSettingEnabled(bus))
@@ -97,7 +97,7 @@ bool isHwDeisolationAllowed(sdbusplus::bus::bus& bus)
             fmt::format("Hardware deisolation is not allowed "
                         "since the HardwareIsolation setting is disabled")
                 .c_str());
-        return false;
+        throw type::CommonError::Unavailable();
     }
 
     using Chassis = sdbusplus::xyz::openbmc_project::State::server::Chassis;
@@ -112,9 +112,8 @@ bool isHwDeisolationAllowed(sdbusplus::bus::bus& bus)
         log<level::ERR>(fmt::format("Manual hardware de-isolation is allowed "
                                     "only when chassis powerstate is off")
                             .c_str());
-        return false;
+        throw type::CommonError::NotAllowed();
     }
-    return true;
 }
 
 void setEnabledProperty(sdbusplus::bus::bus& bus,

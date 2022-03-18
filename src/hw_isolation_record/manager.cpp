@@ -189,7 +189,7 @@ void Manager::isHwIsolationAllowed(const entry::EntrySeverity& severity)
             fmt::format("Hardware isolation is not allowed "
                         "since the HardwareIsolation setting is disabled")
                 .c_str());
-        throw type::CommonError::NotAllowed();
+        throw type::CommonError::Unavailable();
     }
 
     if (severity == entry::EntrySeverity::Manual)
@@ -322,10 +322,8 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
 
 void Manager::deleteAll()
 {
-    if (!hw_isolation::utils::isHwDeisolationAllowed(_bus))
-    {
-        throw type::CommonError::NotAllowed();
-    }
+    // throws exception if not allowed
+    hw_isolation::utils::isHwDeisolationAllowed(_bus);
 
     auto entryIt = _isolatedHardwares.begin();
     while (entryIt != _isolatedHardwares.end())

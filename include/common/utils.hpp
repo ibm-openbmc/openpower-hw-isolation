@@ -144,9 +144,10 @@ void setDBusPropertyVal(sdbusplus::bus::bus& bus, const std::string& objPath,
  *
  * @param[in] bus - Bus to attach to.
  *
- * @return False if not allowed else True
+ * @return Throw appropriate exception if not allowed
+ *         NULL if allowed
  */
-bool isHwDeisolationAllowed(sdbusplus::bus::bus& bus);
+void isHwDeisolationAllowed(sdbusplus::bus::bus& bus);
 
 /**
  * @brief Used to get to know whether hardware isolation setting is
