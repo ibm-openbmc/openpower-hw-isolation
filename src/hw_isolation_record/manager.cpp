@@ -335,7 +335,7 @@ void Manager::deleteAll()
         // Continue other entries to delete if failed to delete one entry
         try
         {
-            entry->delete_();
+            entry->resolveEntry();
         }
         catch (std::exception& e)
         {

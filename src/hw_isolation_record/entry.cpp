@@ -70,6 +70,16 @@ void Entry::delete_()
     // throws exception if not allowed
     hw_isolation::utils::isHwDeisolationAllowed(_bus);
 
+    // throws exception if the user tried deisolate the system
+    // isolated hardware entry
+    if (severity() != EntrySeverity::Manual)
+    {
+        log<level::ERR>(fmt::format("User is not allowed to clear the system "
+                                    "isolated hardware entry")
+                            .c_str());
+        throw type::CommonError::InsufficientPermission();
+    }
+
     resolveEntry();
 }
 
