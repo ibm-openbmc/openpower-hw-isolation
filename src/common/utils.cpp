@@ -232,5 +232,48 @@ std::optional<type::InstanceId> getInstanceId(const std::string& objPathSegment)
     return std::nullopt;
 }
 
+std::optional<std::vector<sdbusplus::message::object_path>>
+    getChildsInventoryPath(sdbusplus::bus::bus& bus,
+                           const sdbusplus::message::object_path& parentObjPath,
+                           const std::string& interfaceName)
+{
+    std::vector<sdbusplus::message::object_path> listOfChildsInventoryPath;
+
+    try
+    {
+        auto dbusServiceName = utils::getDBusServiceName(
+            bus, type::ObjectMapperPath, type::ObjectMapperName);
+
+        auto method =
+            bus.new_method_call(dbusServiceName.c_str(), type::ObjectMapperPath,
+                                type::ObjectMapperName, "GetSubTreePaths");
+
+        std::vector<std::string> listOfIfaces{interfaceName};
+
+        method.append(parentObjPath.str, 0, listOfIfaces);
+
+        auto resp = bus.call(method);
+
+        std::vector<std::string> recvPaths;
+        resp.read(recvPaths);
+
+        std::for_each(recvPaths.begin(), recvPaths.end(),
+                      [&listOfChildsInventoryPath](const auto& ele) {
+                          listOfChildsInventoryPath.push_back(
+                              sdbusplus::message::object_path(ele));
+                      });
+    }
+    catch (const sdbusplus::exception::SdBusError& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}] to get childs inventory path "
+                        "for given objPath[{}] interface[{}]",
+                        e.what(), parentObjPath.str, interfaceName)
+                .c_str());
+        return std::nullopt;
+    }
+    return listOfChildsInventoryPath;
+}
+
 } // namespace utils
 } // namespace hw_isolation

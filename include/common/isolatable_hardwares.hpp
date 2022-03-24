@@ -320,21 +320,6 @@ class IsolatableHWs
         getParentFruPhalDevTreeTgt(struct pdbg_target* devTreeTgt);
 
     /**
-     * @brief Used to get child inventory path by using parent
-     *        parent inventory path with specific interface
-     *
-     * @param[in] parentObjPath - The parent object path to get subtrees
-     * @param[in] interfaceName - The child interface name
-     *
-     * @return The list of child inventory path on success
-     *         Empty optional on failure
-     */
-    std::optional<std::vector<sdbusplus::message::object_path>>
-        getChildsInventoryPath(
-            const sdbusplus::message::object_path& parentObjPath,
-            const std::string& interfaceName);
-
-    /**
      * @brief Used to get the FRU inventory path by using the given
      *        FRU details (location code and instance id)
      *

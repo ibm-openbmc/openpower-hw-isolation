@@ -209,5 +209,21 @@ std::optional<sdbusplus::message::object_path>
 std::optional<type::InstanceId>
     getInstanceId(const std::string& objPathSegment);
 
+/**
+ * @brief Used to get child inventory path by using parent
+ *        parent inventory path with specific interface
+ *
+ * @param[in] bus - Bus to attach to.
+ * @param[in] parentObjPath - The parent object path to get subtrees
+ * @param[in] interfaceName - The child interface name
+ *
+ * @return The list of child inventory path on success
+ *         Empty optional on failure
+ */
+std::optional<std::vector<sdbusplus::message::object_path>>
+    getChildsInventoryPath(sdbusplus::bus::bus& bus,
+                           const sdbusplus::message::object_path& parentObjPath,
+                           const std::string& interfaceName);
+
 } // namespace utils
 } // namespace hw_isolation
