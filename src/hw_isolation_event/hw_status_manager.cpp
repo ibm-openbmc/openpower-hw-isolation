@@ -170,13 +170,13 @@ std::pair<event::EventMsg, event::EventSeverity>
     }
 }
 
-void Manager::restoreHardwaresStatusEvent()
+void Manager::restoreHardwaresStatusEvent(bool osRunning)
 {
     clearHardwaresStatusEvent();
 
     std::for_each(
         _requiredHwsPdbgClass.begin(), _requiredHwsPdbgClass.end(),
-        [this](const auto& ele) {
+        [this, osRunning](const auto& ele) {
             struct pdbg_target* tgt;
             pdbg_for_each_class_target(ele.c_str(), tgt)
             {
@@ -254,6 +254,13 @@ void Manager::restoreHardwaresStatusEvent()
                         {
                             if (hwasState.functional)
                             {
+                                auto functionalInInventory =
+                                    utils::getDBusPropertyVal<bool>(
+                                        _bus, hwInventoryPath->str,
+                                        "xyz.openbmc_project.State.Decorator."
+                                        "OperationalStatus",
+                                        "Functional");
+
                                 if (hwasState.deconfiguredByEid ==
                                     openpower_hw_status::DeconfiguredByReason::
                                         CONFIGURED_BY_RESOURCE_RECOVERY)
@@ -271,6 +278,24 @@ void Manager::restoreHardwaresStatusEvent()
                                                 hwasState.deconfiguredByEid));
                                     eventMsg = std::get<0>(dfgReason);
                                     eventSeverity = std::get<1>(dfgReason);
+                                }
+                                else if (!functionalInInventory && osRunning)
+                                {
+                                    /**
+                                     * Event is required since the hardware is
+                                     * deallocated during OS running.
+                                     *
+                                     * Assumption is, HWAS_STATE won't updated
+                                     * for the runtime deallocation.
+                                     */
+                                    eventErrLogPath =
+                                        std::get<1>(*isolatedhwRecordInfo);
+
+                                    auto hwStatusInfo = getIsolatedHwStatusInfo(
+                                        std::get<0>(*isolatedhwRecordInfo));
+
+                                    eventMsg = std::get<0>(hwStatusInfo);
+                                    eventSeverity = std::get<1>(hwStatusInfo);
                                 }
                                 else
                                 {
@@ -681,6 +706,33 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
         error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
                                   error_log::Level::Informational,
                                   error_log::CollectTraces);
+    }
+}
+
+bool Manager::isOSRunning()
+{
+    auto bootProgressStage = utils::getDBusPropertyVal<std::string>(
+        _bus, HOST_STATE_OBJ_PATH, "xyz.openbmc_project.State.Boot.Progress",
+        "BootProgress");
+
+    if (bootProgressStage == "xyz.openbmc_project.State.Boot.Progress."
+                             "ProgressStages.OSRunning")
+    {
+        return true;
+    }
+
+    return false;
+}
+
+void Manager::restore()
+{
+    auto osRunning = isOSRunning();
+
+    restoreHardwaresStatusEvent(osRunning);
+
+    if (osRunning)
+    {
+        watchOperationalStatusChange();
     }
 }
 

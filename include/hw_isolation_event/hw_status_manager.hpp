@@ -42,15 +42,11 @@ class Manager
     Manager(sdbusplus::bus::bus& bus, record::Manager& hwIsolationRecordMgr);
 
     /**
-     * @brief Used to create hardware status event for all hardware.
+     * @brief API used to restore the hardware status event.
      *
      * @return NULL
-     *
-     * @note This function will skip to create
-     *       the hardware status event if any failures while
-     *       processing all hardware.
      */
-    void restoreHardwaresStatusEvent();
+    void restore();
 
   private:
     /**
@@ -177,6 +173,28 @@ class Manager
      * @return NULL
      */
     void watchOperationalStatusChange();
+
+    /**
+     * @brief API used to know whether OS is running or not.
+     *
+     * @return true if OS is running else false.
+     */
+    bool isOSRunning();
+
+    /**
+     * @brief Used to create hardware status event for all hardware.
+     *
+     * @param[in] osRunning - used to decide whether wants to restore
+     *                        cores events if the cores are deallocated
+     *                        at the runtime. By default, it won't restore.
+     *
+     * @return NULL
+     *
+     * @note This function will skip to create
+     *       the hardware status event if any failures while
+     *       processing all hardware.
+     */
+    void restoreHardwaresStatusEvent(bool osRunning = false);
 };
 
 } // namespace hw_status

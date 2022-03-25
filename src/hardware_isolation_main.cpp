@@ -38,7 +38,7 @@ int main()
         hw_isolation::event::hw_status::Manager hwStatusMgr(bus, record_mgr);
 
         // Restore the hardware status event from their persisted location.
-        hwStatusMgr.restoreHardwaresStatusEvent();
+        hwStatusMgr.restore();
 
         // The below statement should be last to enter this app into the loop
         // to process D-Bus services.
