@@ -92,6 +92,13 @@ class Manager
         _dbusSignalWatcher;
 
     /**
+     * @brief The list of D-Bus object to watch OperationalStatus
+     */
+    std::unordered_map<std::string,
+                       std::unique_ptr<sdbusplus::bus::match::match>>
+        _watcherOnOperationalStatus;
+
+    /**
      * @brief Create the hardware status event dbus object
      *
      * @param[in] eventSeverity - the severity of the event.
@@ -142,6 +149,34 @@ class Manager
      * @return NULL
      */
     void onBootProgressChange(sdbusplus::message::message& message);
+
+    /**
+     * @brief API used to clear the existing events for the given hardware
+     *        inventory path
+     *
+     * @param[in] hwInventoryPath - The hardware inventory path to clear.
+     *
+     * @return NULL
+     */
+    void clearHwStatusEventIfexists(const std::string& hwInventoryPath);
+
+    /**
+     * @brief Used to create event on the object if that object is not
+     *        functional
+     *
+     * @param[in] message - The D-Bus signal message
+     *
+     * @return NULL
+     */
+    void onOperationalStatusChange(sdbusplus::message::message& message);
+
+    /**
+     * @brief Used to create the D-Bus signal watcher on the OperationalStatus
+     *        interface for the defined inventory item interface.
+     *
+     * @return NULL
+     */
+    void watchOperationalStatusChange();
 };
 
 } // namespace hw_status

@@ -30,7 +30,7 @@ namespace dbus_type
 {
 using Interface = std::string;
 using Property = std::string;
-using PropertyValue = std::variant<std::string>;
+using PropertyValue = std::variant<std::string, bool>;
 using Properties = std::map<Property, PropertyValue>;
 using Interfaces = std::map<Interface, Properties>;
 } // namespace dbus_type
@@ -40,6 +40,8 @@ namespace fs = std::filesystem;
 
 constexpr auto HW_STATUS_EVENTS_PATH =
     HW_ISOLATION_OBJPATH "/events/hw_isolation_status";
+
+constexpr auto HOST_STATE_OBJ_PATH = "/xyz/openbmc_project/state/host0";
 
 Manager::Manager(sdbusplus::bus::bus& bus,
                  record::Manager& hwIsolationRecordMgr) :
@@ -52,7 +54,6 @@ Manager::Manager(sdbusplus::bus::bus& bus,
     // if interested signal is occurred.
     try
     {
-        constexpr auto HOST_STATE_OBJ_PATH = "/xyz/openbmc_project/state/host0";
         namespace sdbusplus_match = sdbusplus::bus::match;
 
         // Watch xyz.openbmc_project.State.Host::CurrentHostState property
@@ -396,6 +397,163 @@ void Manager::restoreHardwaresStatusEvent()
         });
 }
 
+void Manager::clearHwStatusEventIfexists(const std::string& hwInventoryPath)
+{
+    std::erase_if(_hwStatusEvents, [this, hwInventoryPath](const auto& ele) {
+        for (const auto& assocEle : ele.second->associations())
+        {
+            if ((std::get<0>(assocEle) == "event_indicator") &&
+                (std::get<2>(assocEle) == hwInventoryPath))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    });
+}
+
+void Manager::onOperationalStatusChange(sdbusplus::message::message& message)
+{
+    try
+    {
+        dbus_type::Interface interface;
+        dbus_type::Properties properties;
+
+        message.read(interface, properties);
+
+        for (const auto& property : properties)
+        {
+            if (property.first == "Functional")
+            {
+                if (const auto* propVal = std::get_if<bool>(&property.second))
+                {
+                    if (!(*propVal))
+                    {
+                        auto isolatedhwRecordInfo =
+                            _hwIsolationRecordMgr.getIsolatedHwRecordInfo(
+                                std::string(message.get_path()));
+
+                        if (!isolatedhwRecordInfo.has_value())
+                        {
+                            // No action, just deconfigured without
+                            // hardware isolation record
+                            return;
+                        }
+                        record::entry::EntryErrLogPath eventErrLogPath =
+                            std::get<1>(*isolatedhwRecordInfo);
+
+                        auto hwStatusInfo = getIsolatedHwStatusInfo(
+                            std::get<0>(*isolatedhwRecordInfo));
+
+                        event::EventMsg eventMsg = std::get<0>(hwStatusInfo);
+                        event::EventSeverity eventSeverity =
+                            std::get<1>(hwStatusInfo);
+
+                        clearHwStatusEventIfexists(message.get_path());
+
+                        auto eventObjPath =
+                            createEvent(eventSeverity, eventMsg,
+                                        message.get_path(), eventErrLogPath);
+                        if (!eventObjPath.has_value())
+                        {
+                            log<level::ERR>(
+                                fmt::format("Failed to create the event for {} "
+                                            "that was deallocated at the host "
+                                            "runtime",
+                                            message.get_path())
+                                    .c_str());
+                            error_log::createErrorLog(
+                                error_log::HwIsolationGenericErrMsg,
+                                error_log::Level::Informational,
+                                error_log::CollectTraces);
+                        }
+                    }
+                }
+                else
+                {
+                    log<level::ERR>(
+                        fmt::format(
+                            "D-Bus Message signature [{}] "
+                            "Failed to read the Functional property value "
+                            "while changed",
+                            message.get_signature())
+                            .c_str());
+                    error_log::createErrorLog(
+                        error_log::HwIsolationGenericErrMsg,
+                        error_log::Level::Informational,
+                        error_log::CollectTraces);
+                }
+                // No need to look other properties
+                break;
+            }
+        }
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format(
+                "Exception [{}] and D-Bus Message signature [{}] "
+                "so failed to get the OperationalStatus properties value "
+                "while changed",
+                e.what(), message.get_signature())
+                .c_str());
+        error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                  error_log::Level::Informational,
+                                  error_log::CollectTraces);
+    }
+}
+
+void Manager::watchOperationalStatusChange()
+{
+    constexpr auto CpuCoreIface = "xyz.openbmc_project.Inventory.Item.CpuCore";
+    auto objsToWatch = utils::getChildsInventoryPath(
+        _bus, std::string("/xyz/openbmc_project/inventory"), CpuCoreIface);
+
+    if (!objsToWatch.has_value())
+    {
+        log<level::ERR>(
+            fmt::format("Failed to get the {} objects from the inventory "
+                        "to watch Functional property",
+                        CpuCoreIface)
+                .c_str());
+        return;
+    }
+
+    // Clear old watcher since inventory item objects might be
+    // vary if the respective FRU is replaced.
+    _watcherOnOperationalStatus.clear();
+
+    for (const auto& objToWatch : *objsToWatch)
+    {
+        try
+        {
+            namespace sdbusplus_match = sdbusplus::bus::match;
+            _watcherOnOperationalStatus.insert(std::make_pair(
+                objToWatch.str,
+                std::make_unique<sdbusplus_match::match>(
+                    _bus,
+                    sdbusplus_match::rules::propertiesChanged(
+                        objToWatch.str, "xyz.openbmc_project.State.Decorator."
+                                        "OperationalStatus"),
+                    std::bind(std::mem_fn(&Manager::onOperationalStatusChange),
+                              this, std::placeholders::_1))));
+        }
+        catch (const std::exception& e)
+        {
+            // Just log error and continue with next object
+            log<level::ERR>(
+                fmt::format("Exception [{}] while adding the D-Bus match "
+                            "rules for {} to watch OperationalStatus",
+                            e.what(), objToWatch.str)
+                    .c_str());
+            error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                      error_log::Level::Informational,
+                                      error_log::CollectTraces);
+        }
+    }
+}
+
 void Manager::onHostStateChange(sdbusplus::message::message& message)
 {
     dbus_type::Interface interface;
@@ -480,6 +638,18 @@ void Manager::onBootProgressChange(sdbusplus::message::message& message)
                                         *propVal)
                                 .c_str());
                         restoreHardwaresStatusEvent();
+                    }
+                    else if (*propVal ==
+                             "xyz.openbmc_project.State.Boot.Progress."
+                             "ProgressStages.OSRunning")
+                    {
+                        log<level::INFO>(
+                            fmt::format("BootProgress is {}, watch "
+                                        "Functional property for the runtime "
+                                        "deallocation",
+                                        *propVal)
+                                .c_str());
+                        watchOperationalStatusChange();
                     }
                 }
                 else
