@@ -261,9 +261,10 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
                                         "OperationalStatus",
                                         "Functional");
 
-                                if (hwasState.deconfiguredByEid ==
-                                    openpower_hw_status::DeconfiguredByReason::
-                                        CONFIGURED_BY_RESOURCE_RECOVERY)
+                                if (functionalInInventory &&
+                                    (hwasState.deconfiguredByEid ==
+                                     openpower_hw_status::DeconfiguredByReason::
+                                         CONFIGURED_BY_RESOURCE_RECOVERY))
                                 {
                                     /**
                                      * Event is required since the hardware is
