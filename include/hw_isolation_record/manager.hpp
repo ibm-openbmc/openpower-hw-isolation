@@ -294,6 +294,20 @@ class Manager :
      * @return NULL
      */
     void handleHostIsolatedHardwares();
+
+    /**
+     * @brief Resolve all entries.
+     *
+     * @param[in] clearRecord - use to decide whether want to clear
+     *                          record from their preserved file.
+     *                          By default, it will clear record.
+     * @return NULL
+     *
+     * @note This function just resolve the entries, won't check
+     *       whether resolve operation is allowed or not like "deleteAll()".
+     */
+    void resolveAllEntries(bool clearRecord = true);
+
 };
 
 } // namespace record

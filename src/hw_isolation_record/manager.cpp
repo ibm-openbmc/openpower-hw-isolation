@@ -103,7 +103,7 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
                                    _bus, entryObjPath, id, recordId, severity,
                                    resolved, associationDeftoHw, entityPath)));
 
-        utils::setEnabledProperty(_bus, isolatedHardware, false);
+        utils::setEnabledProperty(_bus, isolatedHardware, resolved);
 
         // Update the last entry id by using the created entry id.
         _lastEntryId = id;
@@ -319,11 +319,8 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
     }
 }
 
-void Manager::deleteAll()
+void Manager::resolveAllEntries(bool clearRecord)
 {
-    // throws exception if not allowed
-    hw_isolation::utils::isHwDeisolationAllowed(_bus);
-
     auto entryIt = _isolatedHardwares.begin();
     while (entryIt != _isolatedHardwares.end())
     {
@@ -334,7 +331,7 @@ void Manager::deleteAll()
         // Continue other entries to delete if failed to delete one entry
         try
         {
-            entry->resolveEntry();
+            entry->resolveEntry(clearRecord);
         }
         catch (std::exception& e)
         {
@@ -343,6 +340,14 @@ void Manager::deleteAll()
                                 .c_str());
         }
     }
+}
+
+void Manager::deleteAll()
+{
+    // throws exception if not allowed
+    hw_isolation::utils::isHwDeisolationAllowed(_bus);
+
+    resolveAllEntries();
 }
 
 void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
@@ -574,6 +579,8 @@ void Manager::handleHostIsolatedHardwares()
     // Delete all the D-Bus entries if no record in their persisted location
     if ((records.size() == 0) && _isolatedHardwares.size() > 0)
     {
+        // Clean up all entries association before delete.
+        resolveAllEntries(false);
         _isolatedHardwares.clear();
         _lastEntryId = 0;
         return;
