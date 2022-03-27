@@ -76,11 +76,11 @@ void clear(const uint32_t recordId)
     CALL_LIBGUARD_INTERFACE(libguard::clear(recordId);)
 }
 
-GuardRecords getAll()
+GuardRecords getAll(bool persistentTypeOnly)
 {
     GuardRecords records;
 
-    CALL_LIBGUARD_INTERFACE(records = libguard::getAll();)
+    CALL_LIBGUARD_INTERFACE(records = libguard::getAll(persistentTypeOnly);)
 
     return records;
 }

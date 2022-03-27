@@ -48,10 +48,14 @@ void clear(const uint32_t recordId);
 /**
  * @brief Wrapper function for libguard::getAll to get all guard records
  *
+ * @param[in] persistentTypeOnly - Used to decide whether wants to get all
+ *                                 records or only persistent type records.
+ *                                 By default, get all records.
+ *
  * @return The all guard records on success
  *         Throw exception on failure
  */
-GuardRecords getAll();
+GuardRecords getAll(bool persistentTypeOnly = false);
 
 /**
  * @brief Wrapper function for libguard::getGuardFilePath

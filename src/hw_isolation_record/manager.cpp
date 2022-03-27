@@ -520,18 +520,12 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
 
 void Manager::restore()
 {
-    openpower_guard::GuardRecords records = openpower_guard::getAll();
+    // Don't get ephemeral records (GARD_Reconfig and GARD_Sticky_deconfig
+    // because those type records are created for internal purpose to use
+    // by BMC and Hostboot
+    openpower_guard::GuardRecords records = openpower_guard::getAll(true);
 
     std::for_each(records.begin(), records.end(), [this](const auto& record) {
-        // Skipping ephemeral records (GARD_Reconfig and GARD_Sticky_deconfig
-        // because those type records are created for internal purpose to use
-        // by BMC and Hostboot
-        if (record.errType == openpower_guard::GardType::GARD_Reconfig ||
-            record.errType == openpower_guard::GardType::GARD_Sticky_deconfig)
-        {
-            return;
-        }
-
         this->createEntryForRecord(record);
     });
 }
@@ -574,7 +568,10 @@ void Manager::handleHostIsolatedHardwares()
         timerObj->setEnabled(false);
     }
 
-    openpower_guard::GuardRecords records = openpower_guard::getAll();
+    // Don't get ephemeral records (GARD_Reconfig and GARD_Sticky_deconfig
+    // because those type records are created for internal purpose to use
+    // by BMC and Hostboot
+    openpower_guard::GuardRecords records = openpower_guard::getAll(true);
 
     // Delete all the D-Bus entries if no record in their persisted location
     if ((records.size() == 0) && _isolatedHardwares.size() > 0)
@@ -587,15 +584,6 @@ void Manager::handleHostIsolatedHardwares()
     }
 
     std::for_each(records.begin(), records.end(), [this](const auto& record) {
-        // Skipping ephemeral records (GARD_Reconfig and GARD_Sticky_deconfig
-        // because those type records are created for internal purpose to use
-        // by BMC and Hostboot
-        if (record.errType == openpower_guard::GardType::GARD_Reconfig ||
-            record.errType == openpower_guard::GardType::GARD_Sticky_deconfig)
-        {
-            return;
-        }
-
         // Make sure the isolated hardware record is resolved (recordId will
         // get change as "0xFFFFFFFF") by host OR the record is already exist.
         auto isolatedHwIt = std::find_if(
