@@ -25,17 +25,16 @@ using namespace phosphor::logging;
 namespace fs = std::filesystem;
 
 Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
-                 const sd_event* eventLoop) :
+                 const sdeventplus::Event& eventLoop) :
     type::ServerObject<CreateInterface, OP_CreateInterface, DeleteAllInterface>(
         bus, objPath.c_str(), true),
-    _bus(bus), _lastEntryId(0), _isolatableHWs(bus),
+    _bus(bus), _eventLoop(eventLoop), _lastEntryId(0), _isolatableHWs(bus),
     _guardFileWatch(
-        eventLoop, IN_NONBLOCK, IN_CLOSE_WRITE, EPOLLIN,
+        eventLoop.get(), IN_NONBLOCK, IN_CLOSE_WRITE, EPOLLIN,
         openpower_guard::getGuardFilePath(),
-        std::bind(
-            std::mem_fn(
-                &hw_isolation::record::Manager::handleHostIsolatedHardwares),
-            this))
+        std::bind(std::mem_fn(&hw_isolation::record::Manager::
+                                  processHardwareIsolationRecordFile),
+                  this))
 {}
 
 std::optional<uint32_t>
@@ -532,12 +531,43 @@ void Manager::restore()
     });
 }
 
+void Manager::processHardwareIsolationRecordFile()
+{
+    /**
+     * Start timer in the event loop to get the final isolated hardware
+     * record list which are updated by the host because of the atomicity
+     * on the partition file (which is used to store isolated hardware details)
+     * between BMC and Host.
+     */
+    try
+    {
+        _timerObjs.emplace(
+            std::make_unique<
+                sdeventplus::utility::Timer<sdeventplus::ClockId::Monotonic>>(
+                _eventLoop,
+                std::bind(std::mem_fn(&hw_isolation::record::Manager::
+                                          handleHostIsolatedHardwares),
+                          this),
+                std::chrono::seconds(5)));
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(
+            fmt::format("Exception [{}], Failed to process "
+                        "hardware isolation record file that's updated",
+                        e.what())
+                .c_str());
+    }
+}
+
 void Manager::handleHostIsolatedHardwares()
 {
-    // Wait for some time to get the final isolated hardware record list
-    // which are updated by the host because of the atomicity on partition
-    // file (which is used to isolated hardware details) between BMC and Host.
-    sleep(5);
+    auto timerObj = std::move(_timerObjs.front());
+    _timerObjs.pop();
+    if (timerObj->isEnabled())
+    {
+        timerObj->setEnabled(false);
+    }
 
     openpower_guard::GuardRecords records = openpower_guard::getAll();
 

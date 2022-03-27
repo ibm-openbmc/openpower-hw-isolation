@@ -30,7 +30,7 @@ int main()
                                                        HW_ISOLATION_OBJPATH);
 
         hw_isolation::record::Manager record_mgr(bus, HW_ISOLATION_OBJPATH,
-                                                 event.get());
+                                                 event);
 
         // Restore the isolated hardwares from their persisted location.
         record_mgr.restore();

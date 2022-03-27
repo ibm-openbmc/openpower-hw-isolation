@@ -11,6 +11,11 @@
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
+#include <sdeventplus/event.hpp>
+#include <sdeventplus/utility/timer.hpp>
+
+#include <queue>
+
 namespace hw_isolation
 {
 namespace record
@@ -56,7 +61,7 @@ class Manager :
      *  @param[in] eventLoop - Attached event loop on bus.
      */
     Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
-            const sd_event* eventLoop);
+            const sdeventplus::Event& eventLoop);
 
     /**
      *  @brief Implementation for Create
@@ -108,9 +113,11 @@ class Manager :
     void restore();
 
     /**
-     * @brief Callback to add the dbus entry for host isolated hardwares.
+     * @brief Callback to process hardware isolation record file
+     *
+     * @return NULL
      */
-    void handleHostIsolatedHardwares();
+    void processHardwareIsolationRecordFile();
 
     /**
      * @brief Implementation for CreateWithEntityPath
@@ -153,6 +160,11 @@ class Manager :
     sdbusplus::bus::bus& _bus;
 
     /**
+     * @brief Attached sd_event loop
+     */
+    const sdeventplus::Event& _eventLoop;
+
+    /**
      * @brief Last created entry id
      */
     entry::EntryId _lastEntryId;
@@ -171,6 +183,13 @@ class Manager :
      * @brief Watcher to add dbus entry for host isolated hardware
      */
     watch::inotify::Watch _guardFileWatch;
+
+    /**
+     * @brief Timer to wake and process hardware isolation record file
+     */
+    std::queue<std::unique_ptr<
+        sdeventplus::utility::Timer<sdeventplus::ClockId::Monotonic>>>
+        _timerObjs;
 
     /**
      * @brief Used to get EID (aka PEL ID) by using BMC log
@@ -268,6 +287,13 @@ class Manager :
      */
     void updateEntryForRecord(const openpower_guard::GuardRecord& record,
                               IsolatedHardwares::iterator& entryIt);
+
+    /**
+     * @brief Callback to add the dbus entry for host isolated hardwares.
+     *
+     * @return NULL
+     */
+    void handleHostIsolatedHardwares();
 };
 
 } // namespace record
