@@ -516,6 +516,11 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
     {
         entryIt->second->associations(associationDeftoHw);
     }
+
+    if ((record.recordId == 0xFFFFFFFF) && !(entryIt->second->resolved()))
+    {
+        entryIt->second->resolveEntry(false);
+    }
 }
 
 void Manager::restore()
@@ -583,38 +588,34 @@ void Manager::handleHostIsolatedHardwares()
         return;
     }
 
-    std::for_each(records.begin(), records.end(), [this](const auto& record) {
-        // Make sure the isolated hardware record is resolved (recordId will
-        // get change as "0xFFFFFFFF") by host OR the record is already exist.
-        auto isolatedHwIt = std::find_if(
-            _isolatedHardwares.begin(), _isolatedHardwares.end(),
-            [&record](const auto& isolatedHw) {
-                return (
-                    (isolatedHw.second->getEntityPath() == record.targetId) &&
-                    ((record.recordId == 0xFFFFFFFF) ||
-                     (isolatedHw.second->getEntryRecId() == record.recordId)));
-            });
+    /**
+     * First sync all D-Bus entries with retrieved records because
+     * the existing record might be overwritten during creation if that's meets
+     * certain overwritten conditions.
+     */
+    IsolatedHardwares::iterator entryIt = _isolatedHardwares.begin();
+    openpower_guard::GuardRecords::iterator recordIt = records.begin();
+    for (; entryIt != _isolatedHardwares.end(); entryIt++, recordIt++)
+    {
+        if (entryIt->second->resolved() && recordIt->recordId != 0xFFFFFFFF)
+        {
+            // Existing resolved record slot might be used to create new record
+            // if the hardware isolation record partition file is fulled so
+            // update creation time.
+            std::time_t timeStamp = std::time(nullptr);
+            entryIt->second->elapsed(timeStamp);
+        }
+        updateEntryForRecord(*recordIt, entryIt);
+    }
 
-        // If not found in the existing isolated hardware entries list then
-        // the host created a new record for isolating some hardware so
-        // add the new dbus entry for the same.
-        if (isolatedHwIt == _isolatedHardwares.end())
-        {
-            this->createEntryForRecord(record);
-        }
-        else if (record.recordId == 0xFFFFFFFF)
-        {
-            // Update Resolved and Enabled properties respectively
-            // in the hardware isolation entry and inventory D-Bus objects
-            isolatedHwIt->second->resolveEntry(false);
-        }
-        else
-        {
-            // Existing record might be overridden in the libguard during
-            // creation if that's meets certain override conditions
-            updateEntryForRecord(record, isolatedHwIt);
-        }
-    });
+    if (records.size() > _isolatedHardwares.size())
+    {
+        // Create D-Bus entries for the newly created records
+        std::for_each(records.begin() + _isolatedHardwares.size(),
+                      records.end(), [this](const auto& record) {
+                          this->createEntryForRecord(record);
+                      });
+    }
 }
 
 sdbusplus::message::object_path Manager::createWithEntityPath(
