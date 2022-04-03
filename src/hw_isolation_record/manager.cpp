@@ -521,6 +521,24 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
     {
         entryIt->second->resolveEntry(false);
     }
+    else if ((record.recordId != 0xFFFFFFFF) && (entryIt->second->resolved()))
+    {
+        /**
+         * Existing resolved record slot might be used to create new record
+         * if the hardware isolation record partition file is fulled.
+         *
+         * So, Update the required D-Bus properties.
+         * - Update creation time and resolved properties of the entry.
+         * - Update the Enabled property of the newly isolated hardware
+         *   inventory object.
+         */
+        std::time_t timeStamp = std::time(nullptr);
+        entryIt->second->elapsed(timeStamp);
+
+        entryIt->second->resolved(false);
+
+        utils::setEnabledProperty(_bus, *isolatedHwInventoryPath, false);
+    }
 }
 
 void Manager::restore()
@@ -597,24 +615,15 @@ void Manager::handleHostIsolatedHardwares()
     openpower_guard::GuardRecords::iterator recordIt = records.begin();
     for (; entryIt != _isolatedHardwares.end(); entryIt++, recordIt++)
     {
-        if (entryIt->second->resolved() && recordIt->recordId != 0xFFFFFFFF)
-        {
-            // Existing resolved record slot might be used to create new record
-            // if the hardware isolation record partition file is fulled so
-            // update creation time.
-            std::time_t timeStamp = std::time(nullptr);
-            entryIt->second->elapsed(timeStamp);
-        }
         updateEntryForRecord(*recordIt, entryIt);
     }
 
     if (records.size() > _isolatedHardwares.size())
     {
         // Create D-Bus entries for the newly created records
-        std::for_each(records.begin() + _isolatedHardwares.size(),
-                      records.end(), [this](const auto& record) {
-                          this->createEntryForRecord(record);
-                      });
+        std::for_each(
+            records.begin() + _isolatedHardwares.size(), records.end(),
+            [this](const auto& record) { this->createEntryForRecord(record); });
     }
 }
 
