@@ -182,6 +182,27 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
             {
                 try
                 {
+                    if (ele == "fc")
+                    {
+                        struct pdbg_target* coreTgt;
+                        bool ecoCore{false};
+                        pdbg_for_each_target("core", tgt, coreTgt)
+                        {
+                            if (devtree::isECOcore(coreTgt))
+                            {
+                                ecoCore = true;
+                                break;
+                            }
+                        }
+                        if (ecoCore)
+                        {
+                            // ECO core is not modelled in the inventory so,
+                            // event is not required to display the state of
+                            // the core.
+                            continue;
+                        }
+                    }
+
                     ATTR_HWAS_STATE_Type hwasState;
                     if (DT_GET_PROP(ATTR_HWAS_STATE, tgt, hwasState))
                     {
