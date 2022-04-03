@@ -43,10 +43,10 @@ constexpr auto HW_STATUS_EVENTS_PATH =
 
 constexpr auto HOST_STATE_OBJ_PATH = "/xyz/openbmc_project/state/host0";
 
-Manager::Manager(sdbusplus::bus::bus& bus,
+Manager::Manager(sdbusplus::bus::bus& bus, const sdeventplus::Event& eventLoop,
                  record::Manager& hwIsolationRecordMgr) :
     _bus(bus),
-    _lastEventId(0), _isolatableHWs(bus),
+    _eventLoop(eventLoop), _lastEventId(0), _isolatableHWs(bus),
     _hwIsolationRecordMgr(hwIsolationRecordMgr),
     _requiredHwsPdbgClass({"dimm", "fc"})
 {
@@ -460,6 +460,55 @@ void Manager::clearHwStatusEventIfexists(const std::string& hwInventoryPath)
     });
 }
 
+void Manager::handleDeallocatedHw()
+{
+    auto deallocatedHw = std::move(_deallocatedHwHandler.front());
+    _deallocatedHwHandler.pop();
+    if (deallocatedHw.second->isEnabled())
+    {
+        deallocatedHw.second->setEnabled(false);
+    }
+
+    auto isolatedhwRecordInfo = _hwIsolationRecordMgr.getIsolatedHwRecordInfo(
+        std::string(deallocatedHw.first));
+
+    if (!isolatedhwRecordInfo.has_value())
+    {
+        // No action, just deconfigured without
+        // hardware isolation record
+        return;
+    }
+
+    log<level::INFO>(fmt::format("{} is deallocated at the host runtime",
+                                 deallocatedHw.first)
+                         .c_str());
+
+    record::entry::EntryErrLogPath eventErrLogPath =
+        std::get<1>(*isolatedhwRecordInfo);
+
+    auto hwStatusInfo =
+        getIsolatedHwStatusInfo(std::get<0>(*isolatedhwRecordInfo));
+
+    event::EventMsg eventMsg = std::get<0>(hwStatusInfo);
+    event::EventSeverity eventSeverity = std::get<1>(hwStatusInfo);
+
+    clearHwStatusEventIfexists(deallocatedHw.first);
+
+    auto eventObjPath = createEvent(eventSeverity, eventMsg,
+                                    deallocatedHw.first, eventErrLogPath);
+    if (!eventObjPath.has_value())
+    {
+        log<level::ERR>(fmt::format("Failed to create the event for {} "
+                                    "that was deallocated at the host "
+                                    "runtime",
+                                    deallocatedHw.first)
+                            .c_str());
+        error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                  error_log::Level::Informational,
+                                  error_log::CollectTraces);
+    }
+}
+
 void Manager::onOperationalStatusChange(sdbusplus::message::message& message)
 {
     try
@@ -477,44 +526,16 @@ void Manager::onOperationalStatusChange(sdbusplus::message::message& message)
                 {
                     if (!(*propVal))
                     {
-                        auto isolatedhwRecordInfo =
-                            _hwIsolationRecordMgr.getIsolatedHwRecordInfo(
-                                std::string(message.get_path()));
-
-                        if (!isolatedhwRecordInfo.has_value())
-                        {
-                            // No action, just deconfigured without
-                            // hardware isolation record
-                            return;
-                        }
-                        record::entry::EntryErrLogPath eventErrLogPath =
-                            std::get<1>(*isolatedhwRecordInfo);
-
-                        auto hwStatusInfo = getIsolatedHwStatusInfo(
-                            std::get<0>(*isolatedhwRecordInfo));
-
-                        event::EventMsg eventMsg = std::get<0>(hwStatusInfo);
-                        event::EventSeverity eventSeverity =
-                            std::get<1>(hwStatusInfo);
-
-                        clearHwStatusEventIfexists(message.get_path());
-
-                        auto eventObjPath =
-                            createEvent(eventSeverity, eventMsg,
-                                        message.get_path(), eventErrLogPath);
-                        if (!eventObjPath.has_value())
-                        {
-                            log<level::ERR>(
-                                fmt::format("Failed to create the event for {} "
-                                            "that was deallocated at the host "
-                                            "runtime",
-                                            message.get_path())
-                                    .c_str());
-                            error_log::createErrorLog(
-                                error_log::HwIsolationGenericErrMsg,
-                                error_log::Level::Informational,
-                                error_log::CollectTraces);
-                        }
+                        _deallocatedHwHandler.emplace(std::make_pair(
+                            message.get_path(),
+                            std::make_unique<sdeventplus::utility::Timer<
+                                sdeventplus::ClockId::Monotonic>>(
+                                _eventLoop,
+                                std::bind(std::mem_fn(
+                                              &hw_isolation::event::hw_status::
+                                                  Manager::handleDeallocatedHw),
+                                          this),
+                                std::chrono::seconds(5))));
                     }
                 }
                 else

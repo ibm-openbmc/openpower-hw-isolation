@@ -35,7 +35,8 @@ int main()
         // Restore the isolated hardwares from their persisted location.
         record_mgr.restore();
 
-        hw_isolation::event::hw_status::Manager hwStatusMgr(bus, record_mgr);
+        hw_isolation::event::hw_status::Manager hwStatusMgr(bus, event,
+                                                            record_mgr);
 
         // Restore the hardware status event from their persisted location.
         hwStatusMgr.restore();

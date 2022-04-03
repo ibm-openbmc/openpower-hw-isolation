@@ -37,9 +37,11 @@ class Manager
     /** @brief Constructor to put object onto bus at a dbus path.
      *
      *  @param[in] bus - Bus to attach to.
+     *  @param[in] eventLoop - Attached event loop on bus.
      *  @param[in] hwIsolationRecordMgr - the hardware isolation record manager
      */
-    Manager(sdbusplus::bus::bus& bus, record::Manager& hwIsolationRecordMgr);
+    Manager(sdbusplus::bus::bus& bus, const sdeventplus::Event& eventLoop,
+            record::Manager& hwIsolationRecordMgr);
 
     /**
      * @brief API used to restore the hardware status event.
@@ -53,6 +55,11 @@ class Manager
      * @brief Attached bus connection
      */
     sdbusplus::bus::bus& _bus;
+
+    /**
+     * @brief Attached sd_event loop
+     */
+    const sdeventplus::Event& _eventLoop;
 
     /**
      * @brief Last created event id
@@ -93,6 +100,14 @@ class Manager
     std::unordered_map<std::string,
                        std::unique_ptr<sdbusplus::bus::match::match>>
         _watcherOnOperationalStatus;
+
+    /**
+     * @brief Used to handle the deallocated hardware at the host runtime.
+     */
+    std::queue<
+        std::pair<std::string, std::unique_ptr<sdeventplus::utility::Timer<
+                                   sdeventplus::ClockId::Monotonic>>>>
+        _deallocatedHwHandler;
 
     /**
      * @brief Create the hardware status event dbus object
@@ -155,6 +170,13 @@ class Manager
      * @return NULL
      */
     void clearHwStatusEventIfexists(const std::string& hwInventoryPath);
+
+    /**
+     * @brief Used to handle the deallocated hardware at the host runtime.
+     *
+     * @return NULL
+     */
+    void handleDeallocatedHw();
 
     /**
      * @brief Used to create event on the object if that object is not
