@@ -2,6 +2,8 @@
 Description=OpenPOWER Host HardwareIsolation
 Wants=mapper-wait@-xyz-openbmc_project-inventory.service
 After=mapper-wait@-xyz-openbmc_project-inventory.service
+Wants=mapper-wait@-xyz-openbmc_project-state-host0.service
+After=mapper-wait@-xyz-openbmc_project-state-host0.service
 Wants=pldmd.service
 After=pldmd.service
 After=openpower-update-bios-attr-table.service
