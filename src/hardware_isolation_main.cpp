@@ -19,7 +19,6 @@ int main()
         hw_isolation::utils::initExternalModules();
 
         auto bus = sdbusplus::bus::new_default();
-        bus.request_name(HW_ISOLATION_BUSNAME);
 
         auto event = sdeventplus::Event::get_default();
         bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
@@ -40,6 +39,13 @@ int main()
 
         // Restore the hardware status event from their persisted location.
         hwStatusMgr.restore();
+
+        /**
+         * The name should be claimed after the D-Bus service is fully
+         * initialized to avoid sending the "InterfacesAdded" signal
+         * since we are restoring the existing object.
+         */
+        bus.request_name(HW_ISOLATION_BUSNAME);
 
         // The below statement should be last to enter this app into the loop
         // to process D-Bus services.
