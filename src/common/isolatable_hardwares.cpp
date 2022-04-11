@@ -888,15 +888,37 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
             IsolatableHWs::HW_Details::HwId::PhalPdbgClassName(
                 isolatedHwPdbgClass)};
 
-        if (isolatedHwId._pdbgClassName._name == "core")
+        /**
+         * Inventory path is different for ECO core and that need to
+         * get by using the PrettyName since we need to show different
+         * name for the isolated ECO mode core while listing records.
+         */
+        if ((isolatedHwId._pdbgClassName._name == "core") ||
+            (isolatedHwId._pdbgClassName._name == "fc"))
         {
-            if (devtree::isECOcore(*isolatedHwTgt))
+            bool ecoCore{false};
+
+            if (isolatedHwId._pdbgClassName._name == "core")
             {
-                /**
-                 * Inventory path is different for ECO core and that need to
-                 * get by using the PrettyName since we need to show different
-                 * name for the isolated ECO mode core while listing records.
-                 */
+                ecoCore = devtree::isECOcore(*isolatedHwTgt);
+            }
+            else
+            {
+                struct pdbg_target* coreTgt;
+                pdbg_for_each_target("core", *isolatedHwTgt, coreTgt)
+                {
+                    ecoCore = devtree::isECOcore(coreTgt);
+                    if (ecoCore)
+                    {
+                        // If one of the small core is in the eco mode then,
+                        // whole pair will be treated as ECO core
+                        break;
+                    }
+                }
+            }
+
+            if (ecoCore)
+            {
                 isolatedHwDetails =
                     getIsolatableHWDetailsByPrettyName("Cache-Only Core");
             }
