@@ -27,7 +27,7 @@ namespace fs = std::filesystem;
 Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
                  const sdeventplus::Event& eventLoop) :
     type::ServerObject<CreateInterface, OP_CreateInterface, DeleteAllInterface>(
-        bus, objPath.c_str(), true),
+        bus, objPath.c_str()),
     _bus(bus), _eventLoop(eventLoop), _lastEntryId(0), _isolatableHWs(bus),
     _guardFileWatch(
         eventLoop.get(), IN_NONBLOCK, IN_CLOSE_WRITE, EPOLLIN,
