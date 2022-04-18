@@ -20,7 +20,9 @@ Event::Event(sdbusplus::bus::bus& bus, const std::string& objPath,
              const EventMsg& eventMsg,
              const type::AssociationDef& associationDef) :
     type::ServerObject<EventInterface, AssociationDefInterface>(
-        bus, objPath.c_str(), true),
+        bus, objPath.c_str(),
+        type::ServerObject<EventInterface,
+                           AssociationDefInterface>::action::defer_emit),
     _bus(bus), _eventId(eventId)
 {
     // Setting properties which are defined in EventInterface

@@ -26,7 +26,10 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
              const type::AssociationDef& associationDef,
              const openpower_guard::EntityPath& entityPath) :
     type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime,
-                       DeleteInterface>(bus, objPath.c_str(), true),
+                       DeleteInterface>(
+        bus, objPath.c_str(),
+        type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime,
+                           DeleteInterface>::action::defer_emit),
     _bus(bus), _entryId(entryId), _entryRecordId(entryRecordId),
     _entityPath(entityPath)
 {
