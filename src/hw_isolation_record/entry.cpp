@@ -3,6 +3,7 @@
 #include "hw_isolation_record/entry.hpp"
 
 #include "common/utils.hpp"
+#include "hw_isolation_record/manager.hpp"
 
 #include <fmt/format.h>
 
@@ -20,6 +21,7 @@ namespace entry
 using namespace phosphor::logging;
 
 Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
+             hw_isolation::record::Manager& hwIsolationRecordMgr,
              const EntryId entryId, const EntryRecordId entryRecordId,
              const EntrySeverity isolatedHwSeverity,
              const EntryResolved entryIsResolved,
@@ -30,8 +32,8 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
         bus, objPath.c_str(),
         type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime,
                            DeleteInterface>::action::defer_emit),
-    _bus(bus), _entryId(entryId), _entryRecordId(entryRecordId),
-    _entityPath(entityPath)
+    _bus(bus), _hwIsolationRecordMgr(hwIsolationRecordMgr), _entryId(entryId),
+    _entryRecordId(entryRecordId), _entityPath(entityPath)
 {
     // Setting properties which are defined in EntryInterface
     severity(isolatedHwSeverity);
@@ -65,6 +67,8 @@ void Entry::resolveEntry(bool clearRecord)
                 break;
             }
         }
+
+        _hwIsolationRecordMgr.eraseEntry(_entryId);
     }
 }
 

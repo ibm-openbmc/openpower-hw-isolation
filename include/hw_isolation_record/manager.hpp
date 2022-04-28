@@ -97,6 +97,15 @@ class Manager :
         sdbusplus::message::object_path bmcErrorLog) override;
 
     /**
+     * @brief Erase the entry from the manager
+     *
+     * @param[in] entryId - The entry id to erase
+     *
+     * @return NULL
+     */
+    void eraseEntry(const entry::EntryId entryId);
+
+    /**
      * @brief Delete all isolated hardware entires
      *
      * @return NULL
@@ -307,7 +316,6 @@ class Manager :
      *       whether resolve operation is allowed or not like "deleteAll()".
      */
     void resolveAllEntries(bool clearRecord = true);
-
 };
 
 } // namespace record

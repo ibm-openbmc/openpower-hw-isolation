@@ -98,10 +98,10 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
                 bmcErrorLogFwdType, bmcErrorLogRevType, bmcErrorLog));
         }
 
-        _isolatedHardwares.insert(
-            std::make_pair(id, std::make_unique<entry::Entry>(
-                                   _bus, entryObjPath, id, recordId, severity,
-                                   resolved, associationDeftoHw, entityPath)));
+        _isolatedHardwares.insert(std::make_pair(
+            id, std::make_unique<entry::Entry>(
+                    _bus, entryObjPath, *this, id, recordId, severity, resolved,
+                    associationDeftoHw, entityPath)));
 
         utils::setEnabledProperty(_bus, isolatedHardware, resolved);
 
@@ -317,6 +317,11 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
         }
         return *entryPath;
     }
+}
+
+void Manager::eraseEntry(const entry::EntryId entryId)
+{
+    _isolatedHardwares.erase(entryId);
 }
 
 void Manager::resolveAllEntries(bool clearRecord)
