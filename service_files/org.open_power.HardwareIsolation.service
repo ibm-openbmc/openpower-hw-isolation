@@ -9,7 +9,7 @@ After=pldmd.service
 After=openpower-update-bios-attr-table.service
 
 [Service]
-ExecStart=/usr/bin/env openpower-hw-isolation
+ExecStart=/usr/bin/openpower-hw-isolation
 SyslogIdentifier=openpower-hw-isolation
 Restart=always
 Type=dbus
