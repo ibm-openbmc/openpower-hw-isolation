@@ -14,6 +14,7 @@
 
 #include <filesystem>
 #include <iomanip>
+#include <ranges>
 #include <sstream>
 
 namespace hw_isolation
@@ -355,6 +356,16 @@ void Manager::deleteAll()
     resolveAllEntries();
 }
 
+bool Manager::isValidRecord(const entry::EntryRecordId recordId)
+{
+    if (recordId != 0xFFFFFFFF)
+    {
+        return true;
+    }
+
+    return false;
+}
+
 void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
 {
     auto entityPathRawData =
@@ -553,9 +564,17 @@ void Manager::restore()
     // by BMC and Hostboot
     openpower_guard::GuardRecords records = openpower_guard::getAll(true);
 
-    std::for_each(records.begin(), records.end(), [this](const auto& record) {
+    auto validRecord = [this](const auto& record) {
+        return this->isValidRecord(record.recordId);
+    };
+
+    auto validRecords = records | std::views::filter(validRecord);
+
+    auto createEntry = [this](const auto& record) {
         this->createEntryForRecord(record);
-    });
+    };
+
+    std::ranges::for_each(validRecords, createEntry);
 }
 
 void Manager::processHardwareIsolationRecordFile()

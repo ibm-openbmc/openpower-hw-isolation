@@ -316,6 +316,16 @@ class Manager :
      *       whether resolve operation is allowed or not like "deleteAll()".
      */
     void resolveAllEntries(bool clearRecord = true);
+
+    /**
+     * @brief Helper API to check whether hardware isolation record
+     *        is valid or not.
+     *
+     * @param[in] recordId - The record id to check
+     *
+     * @return true if the given record id is valid else false
+     */
+    bool isValidRecord(const entry::EntryRecordId recordId);
 };
 
 } // namespace record
