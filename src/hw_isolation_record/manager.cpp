@@ -630,25 +630,73 @@ void Manager::handleHostIsolatedHardwares()
         return;
     }
 
-    /**
-     * First sync all D-Bus entries with retrieved records because
-     * the existing record might be overwritten during creation if that's meets
-     * certain overwritten conditions.
-     */
-    IsolatedHardwares::iterator entryIt = _isolatedHardwares.begin();
-    openpower_guard::GuardRecords::iterator recordIt = records.begin();
-    for (; entryIt != _isolatedHardwares.end(); entryIt++, recordIt++)
+    auto validRecord = [this](const auto& record) {
+        return this->isValidRecord(record.recordId);
+    };
+
+    for (auto entryIt = _isolatedHardwares.begin();
+         entryIt != _isolatedHardwares.end();)
     {
-        updateEntryForRecord(*recordIt, entryIt);
+        auto nextEntryIt = std::next(entryIt, 1);
+
+        auto entryRecord = [entryIt](const auto& record) {
+            return entryIt->second->getEntityPath() == record.targetId;
+        };
+        auto entryRecords = records | std::views::filter(entryRecord);
+
+        if (entryRecords.empty())
+        {
+            entryIt->second->resolveEntry(false);
+        }
+        else
+        {
+            auto validEntryRecords =
+                entryRecords | std::views::filter(validRecord);
+
+            if (validEntryRecords.empty())
+            {
+                entryIt->second->resolveEntry(false);
+            }
+            else if (std::distance(validEntryRecords.begin(),
+                                   validEntryRecords.end()) == 1)
+            {
+                this->updateEntryForRecord(validEntryRecords.front(), entryIt);
+            }
+            else
+            {
+                // Should not happen since, more than one valid records
+                // for the same hardware is not allowed
+                auto entityPathRawData = devtree::convertEntityPathIntoRawData(
+                    entryIt->second->getEntityPath());
+                std::stringstream ss;
+                std::for_each(entityPathRawData.begin(),
+                              entityPathRawData.end(), [&ss](const auto& ele) {
+                                  ss << std::setw(2) << std::setfill('0')
+                                     << std::hex << (int)ele << " ";
+                              });
+                log<level::ERR>(fmt::format("More than one valid records exist "
+                                            "for the same hardware [{}]",
+                                            ss.str())
+                                    .c_str());
+            }
+        }
+        entryIt = nextEntryIt;
     }
 
-    if (records.size() > _isolatedHardwares.size())
-    {
-        // Create D-Bus entries for the newly created records
-        std::for_each(
-            records.begin() + _isolatedHardwares.size(), records.end(),
-            [this](const auto& record) { this->createEntryForRecord(record); });
-    }
+    auto validRecords = records | std::views::filter(validRecord);
+
+    auto createEntryIfNotExists = [this](const auto& validRecord) {
+        auto recordExist = [validRecord](const auto& entry) {
+            return validRecord.targetId == entry.second->getEntityPath();
+        };
+
+        if (std::ranges::none_of(this->_isolatedHardwares, recordExist))
+        {
+            this->createEntryForRecord(validRecord);
+        }
+    };
+
+    std::ranges::for_each(validRecords, createEntryIfNotExists);
 }
 
 sdbusplus::message::object_path Manager::createWithEntityPath(
