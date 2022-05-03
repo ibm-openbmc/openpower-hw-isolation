@@ -163,14 +163,25 @@ std::pair<bool, sdbusplus::message::object_path> Manager::updateEntry(
 
     // Existing record might be overridden in the libguard during
     // creation if that's meets certain override conditions
+    bool updated{false};
     if (isolatedHwIt->second->severity() != severity)
     {
         isolatedHwIt->second->severity(severity);
+        updated = true;
     }
 
     if (isolatedHwIt->second->associations() != associationDeftoHw)
     {
         isolatedHwIt->second->associations(associationDeftoHw);
+        updated = true;
+    }
+
+    if (updated)
+    {
+        // Existing entry might be overwritten if that's meets certain
+        // overwritten conditions so update creation time.
+        std::time_t timeStamp = std::time(nullptr);
+        isolatedHwIt->second->elapsed(timeStamp);
     }
 
     auto entryObjPath = fs::path(HW_ISOLATION_ENTRY_OBJPATH) /
@@ -522,14 +533,25 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
             bmcErrorLogFwdType, bmcErrorLogRevType, *bmcErrorLogPath));
     }
 
+    bool updated{false};
     if (entryIt->second->severity() != entrySeverity)
     {
         entryIt->second->severity(*entrySeverity);
+        updated = true;
     }
 
     if (entryIt->second->associations() != associationDeftoHw)
     {
         entryIt->second->associations(associationDeftoHw);
+        updated = true;
+    }
+
+    if (updated)
+    {
+        // Existing entry might be overwritten if that's meets certain
+        // overwritten conditions so update creation time.
+        std::time_t timeStamp = std::time(nullptr);
+        entryIt->second->elapsed(timeStamp);
     }
 }
 
