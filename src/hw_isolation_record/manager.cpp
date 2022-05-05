@@ -133,8 +133,7 @@ std::pair<bool, sdbusplus::message::object_path> Manager::updateEntry(
         _isolatedHardwares.begin(), _isolatedHardwares.end(),
         [recordId, entityPath](const auto& isolatedHw) {
             return ((isolatedHw.second->getEntityPath() == entityPath) &&
-                    (isolatedHw.second->getEntryRecId() == recordId) &&
-                    (!isolatedHw.second->resolved()));
+                    (isolatedHw.second->getEntryRecId() == recordId));
         });
 
     if (isolatedHwIt == _isolatedHardwares.end())
@@ -532,29 +531,6 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
     {
         entryIt->second->associations(associationDeftoHw);
     }
-
-    if ((record.recordId == 0xFFFFFFFF) && !(entryIt->second->resolved()))
-    {
-        entryIt->second->resolveEntry(false);
-    }
-    else if ((record.recordId != 0xFFFFFFFF) && (entryIt->second->resolved()))
-    {
-        /**
-         * Existing resolved record slot might be used to create new record
-         * if the hardware isolation record partition file is fulled.
-         *
-         * So, Update the required D-Bus properties.
-         * - Update creation time and resolved properties of the entry.
-         * - Update the Enabled property of the newly isolated hardware
-         *   inventory object.
-         */
-        std::time_t timeStamp = std::time(nullptr);
-        entryIt->second->elapsed(timeStamp);
-
-        entryIt->second->resolved(false);
-
-        utils::setEnabledProperty(_bus, *isolatedHwInventoryPath, false);
-    }
 }
 
 void Manager::restore()
@@ -769,24 +745,19 @@ std::optional<std::tuple<entry::EntrySeverity, entry::EntryErrLogPath>>
 {
     // Make sure whether the given hardware inventory is exists
     // in the record list.
-    auto entryIt =
-        std::find_if(_isolatedHardwares.begin(), _isolatedHardwares.end(),
-                     [hwInventoryPath](const auto& ele) {
-                         for (const auto& assocEle : ele.second->associations())
-                         {
-                             if ((std::get<0>(assocEle) == "isolated_hw") &&
-                                 (std::get<2>(assocEle) == hwInventoryPath.str))
-                             {
-                                 // Make sure whether the given hardware
-                                 // inventory is not resolved because the same
-                                 // hardware might be isolated and resolved many
-                                 // times.
-                                 return !ele.second->resolved();
-                             }
-                         }
+    auto entryIt = std::find_if(
+        _isolatedHardwares.begin(), _isolatedHardwares.end(),
+        [hwInventoryPath](const auto& ele) {
+            for (const auto& assocEle : ele.second->associations())
+            {
+                if (std::get<0>(assocEle) == "isolated_hw")
+                {
+                    return std::get<2>(assocEle) == hwInventoryPath.str;
+                }
+            }
 
-                         return false;
-                     });
+            return false;
+        });
 
     if (entryIt == _isolatedHardwares.end())
     {
