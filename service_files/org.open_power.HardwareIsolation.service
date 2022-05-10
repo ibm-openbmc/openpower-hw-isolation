@@ -7,6 +7,7 @@ After=mapper-wait@-xyz-openbmc_project-state-host0.service
 Wants=pldmd.service
 After=pldmd.service
 After=openpower-update-bios-attr-table.service
+Before=phal-reinit-devtree.service
 
 [Service]
 ExecStart=/usr/bin/openpower-hw-isolation
