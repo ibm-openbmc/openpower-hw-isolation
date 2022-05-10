@@ -22,7 +22,7 @@ using namespace phosphor::logging;
 
 Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
              hw_isolation::record::Manager& hwIsolationRecordMgr,
-             const EntryId entryId, const EntryRecordId entryRecordId,
+             const EntryRecordId entryRecordId,
              const EntrySeverity isolatedHwSeverity,
              const EntryResolved entryIsResolved,
              const type::AssociationDef& associationDef,
@@ -32,7 +32,7 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
         bus, objPath.c_str(),
         type::ServerObject<EntryInterface, AssociationDefInterface, EpochTime,
                            DeleteInterface>::action::defer_emit),
-    _bus(bus), _hwIsolationRecordMgr(hwIsolationRecordMgr), _entryId(entryId),
+    _bus(bus), _hwIsolationRecordMgr(hwIsolationRecordMgr),
     _entryRecordId(entryRecordId), _entityPath(entityPath)
 {
     // Setting properties which are defined in EntryInterface
@@ -68,7 +68,7 @@ void Entry::resolveEntry(bool clearRecord)
             }
         }
 
-        _hwIsolationRecordMgr.eraseEntry(_entryId);
+        _hwIsolationRecordMgr.eraseEntry(_entryRecordId);
     }
 }
 

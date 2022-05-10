@@ -29,7 +29,7 @@ Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
                  const sdeventplus::Event& eventLoop) :
     type::ServerObject<CreateInterface, OP_CreateInterface, DeleteAllInterface>(
         bus, objPath.c_str()),
-    _bus(bus), _eventLoop(eventLoop), _lastEntryId(0), _isolatableHWs(bus),
+    _bus(bus), _eventLoop(eventLoop), _isolatableHWs(bus),
     _guardFileWatch(
         eventLoop.get(), IN_NONBLOCK, IN_CLOSE_WRITE, EPOLLIN,
         openpower_guard::getGuardFilePath(),
@@ -76,9 +76,8 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
 {
     try
     {
-        auto id = _lastEntryId + 1;
         auto entryObjPath =
-            fs::path(HW_ISOLATION_ENTRY_OBJPATH) / std::to_string(id);
+            fs::path(HW_ISOLATION_ENTRY_OBJPATH) / std::to_string(recordId);
 
         // Add association for isolated hardware inventory path
         // Note: Association forward and reverse type are defined as per
@@ -100,14 +99,13 @@ std::optional<sdbusplus::message::object_path> Manager::createEntry(
         }
 
         _isolatedHardwares.insert(std::make_pair(
-            id, std::make_unique<entry::Entry>(
-                    _bus, entryObjPath, *this, id, recordId, severity, resolved,
-                    associationDeftoHw, entityPath)));
+            recordId, std::make_unique<entry::Entry>(
+                          _bus, entryObjPath, *this, recordId, severity,
+                          resolved, associationDeftoHw, entityPath)));
 
         utils::setEnabledProperty(_bus, isolatedHardware, resolved);
 
         // Update the last entry id by using the created entry id.
-        _lastEntryId = id;
         return entryObjPath.string();
     }
     catch (const std::exception& e)
@@ -330,9 +328,9 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
     }
 }
 
-void Manager::eraseEntry(const entry::EntryId entryId)
+void Manager::eraseEntry(const entry::EntryRecordId entryRecordId)
 {
-    _isolatedHardwares.erase(entryId);
+    _isolatedHardwares.erase(entryRecordId);
 }
 
 void Manager::resolveAllEntries(bool clearRecord)
@@ -340,7 +338,7 @@ void Manager::resolveAllEntries(bool clearRecord)
     auto entryIt = _isolatedHardwares.begin();
     while (entryIt != _isolatedHardwares.end())
     {
-        auto entryId = entryIt->first;
+        auto entryRecordId = entryIt->first;
         auto& entry = entryIt->second;
         std::advance(entryIt, 1);
 
@@ -352,7 +350,7 @@ void Manager::resolveAllEntries(bool clearRecord)
         catch (std::exception& e)
         {
             log<level::ERR>(fmt::format("Exception [{}] to delete entry [{}]",
-                                        e.what(), entryId)
+                                        e.what(), entryRecordId)
                                 .c_str());
         }
     }
@@ -624,7 +622,6 @@ void Manager::handleHostIsolatedHardwares()
         // Clean up all entries association before delete.
         resolveAllEntries(false);
         _isolatedHardwares.clear();
-        _lastEntryId = 0;
         return;
     }
 

@@ -27,7 +27,7 @@ using OP_CreateInterface =
     sdbusplus::org::open_power::HardwareIsolation::server::Create;
 
 using IsolatedHardwares =
-    std::map<entry::EntryId, std::unique_ptr<entry::Entry>>;
+    std::map<entry::EntryRecordId, std::unique_ptr<entry::Entry>>;
 
 using DeleteAllInterface =
     sdbusplus::xyz::openbmc_project::Collection::server::DeleteAll;
@@ -99,11 +99,11 @@ class Manager :
     /**
      * @brief Erase the entry from the manager
      *
-     * @param[in] entryId - The entry id to erase
+     * @param[in] entryRecordId - The entry record id to erase
      *
      * @return NULL
      */
-    void eraseEntry(const entry::EntryId entryId);
+    void eraseEntry(const entry::EntryRecordId entryRecordId);
 
     /**
      * @brief Delete all isolated hardware entires
@@ -172,11 +172,6 @@ class Manager :
      * @brief Attached sd_event loop
      */
     const sdeventplus::Event& _eventLoop;
-
-    /**
-     * @brief Last created entry id
-     */
-    entry::EntryId _lastEntryId;
 
     /**
      * @brief Isolated hardwares list

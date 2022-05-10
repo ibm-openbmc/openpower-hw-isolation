@@ -25,7 +25,6 @@ namespace entry
 
 using EntryInterface =
     sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry;
-using EntryId = uint32_t;
 using EntryRecordId = uint32_t;
 using EntrySeverity =
     sdbusplus::xyz::openbmc_project::HardwareIsolation::server::Entry::Type;
@@ -69,7 +68,6 @@ class Entry :
      *  @param[in] bus - Bus to attach with dbus entry object path.
      *  @param[in] objPath - Entry dbus object path to attach.
      *  @param[in] hwIsolationRecordMgr - The manager who owns entry.
-     *  @param[in] entryId - the dbus entry id.
      *  @param[in] entryRecordId - the isolated hardware record id.
      *  @param[in] isolatedHwSeverity - the severity hardware isolation.
      *  @param[in] entryIsResolved - the status of hardware isolation.
@@ -79,7 +77,7 @@ class Entry :
      */
     Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
           hw_isolation::record::Manager& hwIsolationRecordMgr,
-          const EntryId entryId, const EntryRecordId entryRecordId,
+          const EntryRecordId entryRecordId,
           const EntrySeverity isolatedHwSeverity,
           const EntryResolved entryIsResolved,
           const type::AssociationDef& associationDef,
@@ -121,9 +119,6 @@ class Entry :
 
     /** @brief The Manager who owns this enty */
     hw_isolation::record::Manager& _hwIsolationRecordMgr;
-
-    /** @brief The id of isolated hardware dbus entry */
-    EntryId _entryId;
 
     /** @brief The record id of isolated hardware dbus entry
      *
