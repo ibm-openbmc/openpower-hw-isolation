@@ -12,14 +12,33 @@ project('hardware_isolation', 'cpp', 'c',
 )
 
 # openbmc dependency packages list
+
+cpp = meson.get_compiler('cpp')
+
 format = dependency('fmt')
 libdtapi = dependency('libdt-api')
-libguard = meson.get_compiler('cpp').find_library('libguard')
+libguard = cpp.find_library('libguard')
 libpdbg = meson.get_compiler('c').find_library('libpdbg')
 phosphor_dbus_interfaces = dependency('phosphor-dbus-interfaces')
 phosphor_logging = dependency('phosphor-logging')
 sdbusplus = dependency('sdbusplus')
 sdeventplus = dependency('sdeventplus')
+cereal = dependency('cereal', required: false)
+has_cereal = cpp.has_header_symbol(
+    'cereal/cereal.hpp',
+    'cereal::specialize',
+    dependencies: cereal,
+    required: false)
+if not has_cereal
+    cereal_opts = import('cmake').subproject_options()
+    cereal_opts.add_cmake_defines({'BUILD_TESTS': 'OFF'})
+    cereal_proj = import('cmake').subproject(
+        'cereal',
+        options: cereal_opts,
+        required: false)
+    assert(cereal_proj.found(), 'cereal is required')
+    cereal = cereal_proj.dependency('cereal')
+endif
 
 # Configuration header file(config.h) generation
 
@@ -68,7 +87,8 @@ hardware_isolation_dependencies = [
         phosphor_dbus_interfaces,
         phosphor_logging,
         sdbusplus,
-        sdeventplus
+        sdeventplus,
+        cereal
     ]
 
 root_inc_dir = include_directories('include')

@@ -36,7 +36,10 @@ Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
         std::bind(std::mem_fn(&hw_isolation::record::Manager::
                                   processHardwareIsolationRecordFile),
                   this))
-{}
+{
+    fs::create_directories(
+        fs::path(HW_ISOLATION_ENTRY_PERSIST_PATH).parent_path());
+}
 
 std::optional<uint32_t>
     Manager::getEID(const sdbusplus::message::object_path& bmcErrorLog) const
@@ -185,6 +188,7 @@ std::pair<bool, sdbusplus::message::object_path> Manager::updateEntry(
     auto entryObjPath = fs::path(HW_ISOLATION_ENTRY_OBJPATH) /
                         std::to_string(isolatedHwIt->first);
 
+    isolatedHwIt->second->serialize();
     return std::make_pair(true, entryObjPath.string());
 }
 
@@ -551,6 +555,8 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
         std::time_t timeStamp = std::time(nullptr);
         entryIt->second->elapsed(timeStamp);
     }
+
+    entryIt->second->serialize();
 }
 
 void Manager::restore()

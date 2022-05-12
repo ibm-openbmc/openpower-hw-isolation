@@ -5,6 +5,8 @@
 #include "common/common_types.hpp"
 #include "hw_isolation_record/openpower_guard_interface.hpp"
 
+#include <cereal/access.hpp>
+#include <cereal/cereal.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
 #include <xyz/openbmc_project/Object/Delete/server.hpp>
@@ -19,6 +21,9 @@ namespace record
 {
 
 class Manager;
+
+constexpr auto HW_ISOLATION_ENTRY_PERSIST_PATH =
+    "/var/lib/op-hw-isolation/persistdata/record_entry/{}";
 
 namespace entry
 {
@@ -61,7 +66,7 @@ class Entry :
     Entry& operator=(const Entry&) = delete;
     Entry(Entry&&) = delete;
     Entry& operator=(Entry&&) = delete;
-    virtual ~Entry() = default;
+    virtual ~Entry();
 
     /** @brief Constructor to put object onto bus at a dbus path.
      *
@@ -113,6 +118,20 @@ class Entry :
      */
     EntryRecordId getEntryRecId() const;
 
+    /**
+     * @brief Serialize and persisted the required members
+     *
+     * @return NULL
+     */
+    void serialize();
+
+    /**
+     * @brief Deserialize the persisted members.
+     *
+     * @return true if deserialized false otherwise.
+     */
+    bool deserialize();
+
   private:
     /** @brief Attached bus connection */
     sdbusplus::bus::bus& _bus;
@@ -128,6 +147,58 @@ class Entry :
 
     /** @brief The entity path of this entry */
     openpower_guard::EntityPath _entityPath;
+
+    /**
+     * @brief Allow cereal class access to allow save and load functions
+     *        to be private
+     */
+    friend class cereal::access;
+
+    /**
+     * @brief Helper template that is required by Cereal to perform
+     *        serialization.
+     *
+     * @details It will only serialize the required members that are not
+     *          persisted in the hardware isolation partition file that
+     *          shared between the BMC and Host applications.
+     *
+     * @tparam Archive    - Cereal archive type (BinaryOutputArchive).
+     * @param[in] archive - Reference to Cereal archive.
+     * @param[in] version - Class version that enables handling
+     *                      a serialized data.
+     *
+     * @return NULL
+     */
+    template <class Archive>
+    void save(Archive& archive, const uint32_t /*version*/) const
+    {
+        archive(elapsed());
+    }
+
+    /**
+     * @brief Helper template that is required by Cereal to perform
+     *        deserialization.
+     *
+     * @details It will only deserialize the required members that are not
+     *          persisted in the hardware isolation partition file that
+     *          shared between the BMC and Host applications.
+     *
+     * @tparam Archive    - Cereal archive type (BinaryInputArchive).
+     * @param[in] archive - Reference to Cereal archive.
+     * @param[in] version - Class version that enables handling
+     *                      a deserialized data.
+     *
+     * @return NULL
+     */
+    template <class Archive>
+    void load(Archive& archive, const uint32_t /*version*/)
+    {
+        uint64_t persistedElapsed;
+        archive(persistedElapsed);
+
+        // Skip to send property change signal in the restore path.
+        elapsed(persistedElapsed, true);
+    }
 
 }; // end of Entry class
 

@@ -7,9 +7,16 @@
 
 #include <fmt/format.h>
 
+#include <cereal/archives/binary.hpp>
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <ctime>
+#include <fstream>
+
+// Associate Entry Class with version number
+constexpr uint32_t Cereal_EntryClassVersion = 1;
+CEREAL_CLASS_VERSION(hw_isolation::record::entry::Entry,
+                     Cereal_EntryClassVersion);
 
 namespace hw_isolation
 {
@@ -17,6 +24,7 @@ namespace record
 {
 namespace entry
 {
+namespace fs = std::filesystem;
 
 using namespace phosphor::logging;
 
@@ -44,9 +52,28 @@ Entry::Entry(sdbusplus::bus::bus& bus, const std::string& objPath,
     std::time_t timeStamp = std::time(nullptr);
     elapsed(timeStamp);
 
+    // Signal won't be sent since D-Bus name requested after restore
+    // even if we sent noop at the mapper side.
+    if (!deserialize())
+    {
+        // Need to serialize entry members if it did not deserialize
+        // since this constructor might be called in the restore path
+        // and at the runtime
+        serialize();
+    }
+
     // Emit the signal for entry object creation since it deferred in
     // interface constructor
     this->emit_object_added();
+}
+
+Entry::~Entry()
+{
+    fs::path path{fmt::format(HW_ISOLATION_ENTRY_PERSIST_PATH, _entryRecordId)};
+    if (fs::exists(path))
+    {
+        fs::remove(path);
+    }
 }
 
 void Entry::resolveEntry(bool clearRecord)
@@ -98,6 +125,50 @@ openpower_guard::EntityPath Entry::getEntityPath() const
 EntryRecordId Entry::getEntryRecId() const
 {
     return _entryRecordId;
+}
+
+void Entry::serialize()
+{
+    fs::path path{fmt::format(HW_ISOLATION_ENTRY_PERSIST_PATH, _entryRecordId)};
+    try
+    {
+        std::ofstream os(path.c_str(), std::ios::binary);
+        cereal::BinaryOutputArchive oarchive(os);
+        oarchive(*this);
+    }
+    catch (const cereal::Exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception: [{}] during serialize the "
+                                    "hardware isolation entry into {}",
+                                    e.what(), path.string())
+                            .c_str());
+        fs::remove(path);
+    }
+}
+
+bool Entry::deserialize()
+{
+    fs::path path{fmt::format(HW_ISOLATION_ENTRY_PERSIST_PATH, _entryRecordId)};
+    try
+    {
+        if (fs::exists(path))
+        {
+            std::ifstream is(path.c_str(), std::ios::in | std::ios::binary);
+            cereal::BinaryInputArchive iarchive(is);
+            iarchive(*this);
+            return true;
+        }
+        return false;
+    }
+    catch (const cereal::Exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception: [{}] during deserialize the "
+                                    "hardware isolation entry from {}",
+                                    e.what(), path.string())
+                            .c_str());
+        fs::remove(path);
+        return false;
+    }
 }
 
 namespace utils
