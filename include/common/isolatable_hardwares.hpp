@@ -212,12 +212,15 @@ class IsolatableHWs
      * @brief Used to get the inventory path of isolated hardware
      *
      * @param[in] physicalPath - The physical path of isolated hardware
+     * @param[in|out] persistedCoreEcoMode - Used to indicate or get the core
+     *                                       eco mode.
      *
      * @return The isolated hardware inventory path on success
      *         Empty optional on failure
      */
     std::optional<sdbusplus::message::object_path>
-        getInventoryPath(const devtree::DevTreePhysPath& physicalPath);
+        getInventoryPath(const devtree::DevTreePhysPath& physicalPath,
+                         bool& persistedCoreEcoMode);
 
   private:
     /**

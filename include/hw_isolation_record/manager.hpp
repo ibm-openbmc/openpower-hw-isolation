@@ -11,6 +11,7 @@
 #include "xyz/openbmc_project/Collection/DeleteAll/server.hpp"
 #include "xyz/openbmc_project/HardwareIsolation/Create/server.hpp"
 
+#include <cereal/types/set.hpp>
 #include <sdeventplus/event.hpp>
 #include <sdeventplus/utility/timer.hpp>
 
@@ -31,6 +32,8 @@ using IsolatedHardwares =
 
 using DeleteAllInterface =
     sdbusplus::xyz::openbmc_project::Collection::server::DeleteAll;
+
+using EcoCores = std::set<devtree::DevTreePhysPath>;
 
 /**
  *  @class Manager
@@ -196,6 +199,59 @@ class Manager :
         _timerObjs;
 
     /**
+     * @brief Used to maintain isolated eco core records.
+     *
+     * @details * TODO: It is a workaround until fix the following issue
+     *            ibm-openbmc/dev/issues/3573.
+     *          * It will only persisted to use in the disruptive code update
+     *            restore path.
+     */
+    EcoCores _persistedEcoCores;
+
+    /**
+     * @brief Allow cereal class access to allow save and load functions
+     *        to be private
+     */
+    friend class cereal::access;
+
+    /**
+     * @brief Helper template that is required by Cereal to perform
+     *        serialization and deserialization.
+     *
+     * @details * TODO: It is a workaround until fix the following issue
+     *            ibm-openbmc/dev/issues/3573.
+     *          * It will only serialize and deserialize
+     *            the "_persistedEcoCores" member that is not persisted
+     *            in the disruptive code update.
+     *
+     * @tparam Archive    - Cereal archive type.
+     * @param[in] archive - Reference to Cereal archive.
+     * @param[in] version - Class version that enables handling
+     *                      a serialized data.
+     *
+     * @return NULL
+     */
+    template <class Archive>
+    void serialize(Archive& archive, const uint32_t /*version*/)
+    {
+        archive(_persistedEcoCores);
+    }
+
+    /**
+     * @brief Used to serialize ECO core records.
+     *
+     * @return NULL
+     */
+    void serialize();
+
+    /**
+     * @brief Used to Deserialize ECO core records.
+     *
+     * @return true if deserialized false otherwise.
+     */
+    bool deserialize();
+
+    /**
      * @brief Used to get EID (aka PEL ID) by using BMC log
      *        object path
      *
@@ -266,6 +322,9 @@ class Manager :
      * @brief Create dbus entry object for isolated hardware record
      *
      * @param[in] record - The isolated hardware record
+     * @param[in] isRestorePath - Used to indicate whether trying get inventory
+     *                            path at the restore path or runtime.
+     *                            By default is "false".
      *
      * @return NULL on success
      *
@@ -274,7 +333,8 @@ class Manager :
      *       so the hardware isolation application need to create dbus entries
      *       for all isolated hardware that is stored in the preserved location.
      */
-    void createEntryForRecord(const openpower_guard::GuardRecord& record);
+    void createEntryForRecord(const openpower_guard::GuardRecord& record,
+                              const bool isRestorePath = false);
 
     /**
      * @brief Update the given dbus entry object for isolated hardware record
@@ -328,6 +388,26 @@ class Manager :
      * @return NULL
      */
     void cleanupPersistedFiles();
+
+    /**
+     * @brief Helper API to update ECO cores list based on the given
+     *        "ecoCore" flag.
+     *
+     * @param[in] ecoCore - Indicate whether the Core is eco core or not.
+     * @param[in] coreDevTreePhysPath - The core device tree physical path.
+     *
+     * @return NULL
+     */
+    void
+        updateEcoCoresList(const bool ecoCore,
+                           const devtree::DevTreePhysPath& coreDevTreePhysPath);
+
+    /**
+     * @brief Helper API to cleanup persisted eco cores
+     *
+     * @return NULL
+     */
+    void cleanupPersistedEcoCores();
 };
 
 } // namespace record

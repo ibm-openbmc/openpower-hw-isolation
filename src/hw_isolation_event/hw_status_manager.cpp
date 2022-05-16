@@ -243,8 +243,11 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
                                   std::end(physBinPath),
                                   std::back_inserter(devTreePhysPath));
 
-                        auto hwInventoryPath =
-                            _isolatableHWs.getInventoryPath(devTreePhysPath);
+                        // TODO: It is a workaround until fix the following
+                        //       issue ibm-openbmc/dev/issues/3573.
+                        bool ecoCore{false};
+                        auto hwInventoryPath = _isolatableHWs.getInventoryPath(
+                            devTreePhysPath, ecoCore);
 
                         if (!hwInventoryPath.has_value())
                         {

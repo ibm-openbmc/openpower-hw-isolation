@@ -9,13 +9,19 @@
 
 #include <fmt/format.h>
 
+#include <cereal/archives/binary.hpp>
 #include <phosphor-logging/elog-errors.hpp>
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 
 #include <filesystem>
+#include <fstream>
 #include <iomanip>
 #include <ranges>
 #include <sstream>
+
+// Associate Manager Class with version number
+constexpr uint32_t Cereal_ManagerClassVersion = 1;
+CEREAL_CLASS_VERSION(hw_isolation::record::Manager, Cereal_ManagerClassVersion);
 
 namespace hw_isolation
 {
@@ -24,6 +30,9 @@ namespace record
 
 using namespace phosphor::logging;
 namespace fs = std::filesystem;
+
+constexpr auto HW_ISOLATION_ENTRY_MGR_PERSIST_PATH =
+    "/var/lib/op-hw-isolation/persistdata/record_mgr/{}";
 
 Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
                  const sdeventplus::Event& eventLoop) :
@@ -39,6 +48,76 @@ Manager::Manager(sdbusplus::bus::bus& bus, const std::string& objPath,
 {
     fs::create_directories(
         fs::path(HW_ISOLATION_ENTRY_PERSIST_PATH).parent_path());
+
+    deserialize();
+}
+
+void Manager::serialize()
+{
+    fs::path path{
+        fmt::format(HW_ISOLATION_ENTRY_MGR_PERSIST_PATH, "eco_cores")};
+
+    if (_persistedEcoCores.empty())
+    {
+        fs::remove(path);
+        return;
+    }
+
+    fs::create_directories(path.parent_path());
+    try
+    {
+        std::ofstream os(path.c_str(), std::ios::binary);
+        cereal::BinaryOutputArchive oarchive(os);
+        oarchive(*this);
+    }
+    catch (const cereal::Exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception: [{}] during serialize the "
+                                    "eco cores physical path into {}",
+                                    e.what(), path.string())
+                            .c_str());
+        fs::remove(path);
+    }
+}
+
+bool Manager::deserialize()
+{
+    fs::path path{
+        fmt::format(HW_ISOLATION_ENTRY_MGR_PERSIST_PATH, "eco_cores")};
+    try
+    {
+        if (fs::exists(path))
+        {
+            std::ifstream is(path.c_str(), std::ios::in | std::ios::binary);
+            cereal::BinaryInputArchive iarchive(is);
+            iarchive(*this);
+            return true;
+        }
+        return false;
+    }
+    catch (const cereal::Exception& e)
+    {
+        log<level::ERR>(fmt::format("Exception: [{}] during deserialize the "
+                                    "eco cores physical path into {}",
+                                    e.what(), path.string())
+                            .c_str());
+        fs::remove(path);
+        return false;
+    }
+}
+
+void Manager::updateEcoCoresList(
+    const bool ecoCore, const devtree::DevTreePhysPath& coreDevTreePhysPath)
+{
+    if (ecoCore)
+    {
+        _persistedEcoCores.emplace(coreDevTreePhysPath);
+    }
+    else
+    {
+        _persistedEcoCores.erase(coreDevTreePhysPath);
+    }
+    serialize();
 }
 
 std::optional<uint32_t>
@@ -334,6 +413,12 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
 
 void Manager::eraseEntry(const entry::EntryRecordId entryRecordId)
 {
+    if (_isolatedHardwares.contains(entryRecordId))
+    {
+        updateEcoCoresList(
+            false, devtree::convertEntityPathIntoRawData(
+                       _isolatedHardwares.at(entryRecordId)->getEntityPath()));
+    }
     _isolatedHardwares.erase(entryRecordId);
 }
 
@@ -378,7 +463,8 @@ bool Manager::isValidRecord(const entry::EntryRecordId recordId)
     return false;
 }
 
-void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
+void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record,
+                                   const bool isRestorePath)
 {
     auto entityPathRawData =
         devtree::convertEntityPathIntoRawData(record.targetId);
@@ -397,8 +483,11 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
             resolved = true;
         }
 
+        bool ecoCore{
+            (_persistedEcoCores.contains(entityPathRawData) && isRestorePath)};
+
         auto isolatedHwInventoryPath =
-            _isolatableHWs.getInventoryPath(entityPathRawData);
+            _isolatableHWs.getInventoryPath(entityPathRawData, ecoCore);
 
         if (!isolatedHwInventoryPath.has_value())
         {
@@ -410,6 +499,7 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record)
                     .c_str());
             return;
         }
+        updateEcoCoresList(ecoCore, entityPathRawData);
 
         auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
 
@@ -476,8 +566,10 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
                          << (int)ele << " ";
                   });
 
+    bool ecoCore{false};
+
     auto isolatedHwInventoryPath =
-        _isolatableHWs.getInventoryPath(entityPathRawData);
+        _isolatableHWs.getInventoryPath(entityPathRawData, ecoCore);
 
     if (!isolatedHwInventoryPath.has_value())
     {
@@ -488,6 +580,7 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
                 .c_str());
         return;
     }
+    updateEcoCoresList(ecoCore, entityPathRawData);
 
     auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
 
@@ -559,6 +652,43 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
     entryIt->second->serialize();
 }
 
+void Manager::cleanupPersistedEcoCores()
+{
+    bool updated{false};
+    if (_isolatedHardwares.empty())
+    {
+        _persistedEcoCores.clear();
+        updated = true;
+    }
+    else
+    {
+        for (auto ecoCore = _persistedEcoCores.begin();
+             ecoCore != _persistedEcoCores.end();)
+        {
+            auto nextEcoCore = std::next(ecoCore, 1);
+
+            auto isNotIsolated = std::ranges::none_of(
+                _isolatedHardwares, [ecoCore](const auto& entry) {
+                    return (entry.second->getEntityPath() ==
+                            openpower_guard::EntityPath(ecoCore->data()));
+                });
+
+            if (isNotIsolated)
+            {
+                updateEcoCoresList(false, *ecoCore);
+                updated = true;
+            }
+
+            ecoCore = nextEcoCore;
+        }
+    }
+
+    if (updated)
+    {
+        serialize();
+    }
+}
+
 void Manager::cleanupPersistedFiles()
 {
     auto deletePersistedEntryFileIfNotExist = [this](const auto& file) {
@@ -574,6 +704,8 @@ void Manager::cleanupPersistedFiles()
         fs::directory_iterator(
             fs::path(HW_ISOLATION_ENTRY_PERSIST_PATH).parent_path()),
         deletePersistedEntryFileIfNotExist);
+
+    cleanupPersistedEcoCores();
 }
 
 void Manager::restore()
@@ -590,7 +722,7 @@ void Manager::restore()
     auto validRecords = records | std::views::filter(validRecord);
 
     auto createEntry = [this](const auto& record) {
-        this->createEntryForRecord(record);
+        this->createEntryForRecord(record, true);
     };
 
     std::ranges::for_each(validRecords, createEntry);
@@ -717,6 +849,8 @@ void Manager::handleHostIsolatedHardwares()
     };
 
     std::ranges::for_each(validRecords, createEntryIfNotExists);
+
+    cleanupPersistedEcoCores();
 }
 
 sdbusplus::message::object_path Manager::createWithEntityPath(
@@ -727,7 +861,11 @@ sdbusplus::message::object_path Manager::createWithEntityPath(
 {
     isHwIsolationAllowed(severity);
 
-    auto isolateHwInventoryPath = _isolatableHWs.getInventoryPath(entityPath);
+    bool ecoCore{false};
+
+    auto isolateHwInventoryPath =
+        _isolatableHWs.getInventoryPath(entityPath, ecoCore);
+
     std::stringstream ss;
     std::for_each(entityPath.begin(), entityPath.end(), [&ss](const auto& ele) {
         ss << std::setw(2) << std::setfill('0') << std::hex << (int)ele << " ";
@@ -739,6 +877,7 @@ sdbusplus::message::object_path Manager::createWithEntityPath(
                 .c_str());
         throw type::CommonError::InvalidArgument();
     }
+    updateEcoCoresList(ecoCore, entityPath);
 
     auto eId = getEID(bmcErrorLog);
     if (!eId.has_value())

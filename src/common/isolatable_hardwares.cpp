@@ -857,7 +857,7 @@ std::optional<sdbusplus::message::object_path>
 }
 
 std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
-    const devtree::DevTreePhysPath& physicalPath)
+    const devtree::DevTreePhysPath& physicalPath, bool& persistedCoreEcoMode)
 {
     try
     {
@@ -917,10 +917,15 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
                 }
             }
 
-            if (ecoCore)
+            if (ecoCore || persistedCoreEcoMode)
             {
                 isolatedHwDetails =
                     getIsolatableHWDetailsByPrettyName("Cache-Only Core");
+
+                if (!persistedCoreEcoMode)
+                {
+                    persistedCoreEcoMode = true;
+                }
             }
             else
             {
