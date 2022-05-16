@@ -3,10 +3,12 @@
 #pragma once
 
 #include "common/common_types.hpp"
+#include "common/phal_devtree_utils.hpp"
 #include "hw_isolation_record/openpower_guard_interface.hpp"
 
 #include <cereal/access.hpp>
 #include <cereal/cereal.hpp>
+#include <cereal/types/vector.hpp>
 #include <xyz/openbmc_project/Association/Definitions/server.hpp>
 #include <xyz/openbmc_project/HardwareIsolation/Entry/server.hpp>
 #include <xyz/openbmc_project/Object/Delete/server.hpp>
@@ -172,7 +174,10 @@ class Entry :
     template <class Archive>
     void save(Archive& archive, const uint32_t /*version*/) const
     {
-        archive(elapsed());
+        auto entityPathRawData =
+            hw_isolation::devtree::convertEntityPathIntoRawData(_entityPath);
+
+        archive(entityPathRawData, elapsed());
     }
 
     /**
@@ -193,11 +198,22 @@ class Entry :
     template <class Archive>
     void load(Archive& archive, const uint32_t /*version*/)
     {
+        hw_isolation::devtree::DevTreePhysPath persistedEntityPathRawData;
         uint64_t persistedElapsed;
-        archive(persistedElapsed);
 
-        // Skip to send property change signal in the restore path.
-        elapsed(persistedElapsed, true);
+        // Must be ordered based on the serialization to deserialize.
+        archive(persistedEntityPathRawData, persistedElapsed);
+
+        if (openpower_guard::EntityPath(persistedEntityPathRawData.data()) ==
+            _entityPath)
+        {
+            // Skip to send property change signal in the restore path.
+            elapsed(persistedElapsed, true);
+        }
+        else
+        {
+            serialize();
+        }
     }
 
 }; // end of Entry class

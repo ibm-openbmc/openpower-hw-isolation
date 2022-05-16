@@ -321,6 +321,13 @@ class Manager :
      * @return true if the given record id is valid else false
      */
     bool isValidRecord(const entry::EntryRecordId recordId);
+
+    /**
+     * @brief Helper API to cleanup persisted files
+     *
+     * @return NULL
+     */
+    void cleanupPersistedFiles();
 };
 
 } // namespace record

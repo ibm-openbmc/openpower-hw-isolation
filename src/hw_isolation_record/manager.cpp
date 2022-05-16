@@ -559,6 +559,23 @@ void Manager::updateEntryForRecord(const openpower_guard::GuardRecord& record,
     entryIt->second->serialize();
 }
 
+void Manager::cleanupPersistedFiles()
+{
+    auto deletePersistedEntryFileIfNotExist = [this](const auto& file) {
+        auto fileEntryId = std::stoul(file.path().filename());
+
+        if (!(this->_isolatedHardwares.contains(fileEntryId)))
+        {
+            fs::remove(file.path());
+        }
+    };
+
+    std::ranges::for_each(
+        fs::directory_iterator(
+            fs::path(HW_ISOLATION_ENTRY_PERSIST_PATH).parent_path()),
+        deletePersistedEntryFileIfNotExist);
+}
+
 void Manager::restore()
 {
     // Don't get ephemeral records (GARD_Reconfig and GARD_Sticky_deconfig
@@ -577,6 +594,8 @@ void Manager::restore()
     };
 
     std::ranges::for_each(validRecords, createEntry);
+
+    cleanupPersistedFiles();
 }
 
 void Manager::processHardwareIsolationRecordFile()
