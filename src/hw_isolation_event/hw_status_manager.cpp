@@ -651,6 +651,19 @@ void Manager::onHostStateChange(sdbusplus::message::message& message)
                                 .c_str());
                         restoreHardwaresStatusEvent();
                     }
+                    if (*propVal ==
+                        "xyz.openbmc_project.State.Host.HostState.Off")
+                    {
+                        if (!_watcherOnOperationalStatus.empty())
+                        {
+                            log<level::INFO>(
+                                fmt::format("HostState is {}, remove runtime "
+                                            "deallocation watcher.",
+                                            *propVal)
+                                    .c_str());
+                            _watcherOnOperationalStatus.clear();
+                        }
+                    }
                 }
                 else
                 {
