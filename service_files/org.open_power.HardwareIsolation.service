@@ -8,6 +8,7 @@ Wants=pldmd.service
 After=pldmd.service
 After=openpower-update-bios-attr-table.service
 Before=phal-reinit-devtree.service
+After=phal-import-devtree@0.service
 
 [Service]
 ExecStart=/usr/bin/openpower-hw-isolation
