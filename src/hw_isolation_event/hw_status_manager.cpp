@@ -50,6 +50,9 @@ Manager::Manager(sdbusplus::bus::bus& bus, const sdeventplus::Event& eventLoop,
     _hwIsolationRecordMgr(hwIsolationRecordMgr),
     _requiredHwsPdbgClass({"dimm", "fc"})
 {
+    fs::create_directories(
+        fs::path(HW_ISOLATION_EVENT_PERSIST_PATH).parent_path());
+
     // Adding the required D-Bus match rules to create hardware status event
     // if interested signal is occurred.
     try
@@ -783,11 +786,38 @@ bool Manager::isOSRunning()
     return false;
 }
 
+void Manager::restorePersistedHwIsolationStatusEvent()
+{
+    auto createEventForPersistedEventFile = [this](const auto& file) {
+        auto fileEventId = std::stoul(file.path().filename());
+
+        auto eventObjPath =
+            fs::path(HW_STATUS_EVENTS_PATH) / file.path().filename();
+
+        // All members will be filled from persisted file.
+        this->_hwStatusEvents.insert(std::make_pair(
+            fileEventId,
+            std::make_unique<hw_isolation::event::Event>(
+                this->_bus, eventObjPath, fileEventId, event::EventSeverity(),
+                event::EventMsg(), type::AssociationDef(), true)));
+
+        if (this->_lastEventId < fileEventId)
+        {
+            this->_lastEventId = fileEventId;
+        }
+    };
+
+    std::ranges::for_each(
+        fs::directory_iterator(
+            fs::path(HW_ISOLATION_EVENT_PERSIST_PATH).parent_path()),
+        createEventForPersistedEventFile);
+}
+
 void Manager::restore()
 {
     auto osRunning = isOSRunning();
 
-    restoreHardwaresStatusEvent(osRunning);
+    restorePersistedHwIsolationStatusEvent();
 
     if (osRunning)
     {

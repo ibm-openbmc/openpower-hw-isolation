@@ -217,6 +217,14 @@ class Manager
      *       processing all hardware.
      */
     void restoreHardwaresStatusEvent(bool osRunning = false);
+
+    /**
+     * @brief Helper API to restore hardware isolation status event from
+     *        the persisted files.
+     *
+     * @return NULL
+     */
+    void restorePersistedHwIsolationStatusEvent();
 };
 
 } // namespace hw_status
