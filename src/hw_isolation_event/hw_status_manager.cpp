@@ -349,65 +349,71 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
                                 eventSeverity = std::get<1>(hwStatusInfo);
                             }
                         }
-                        else if (!isolatedhwRecordInfo.has_value() &&
-                                 hwasState.functional)
-                        {
-                            /**
-                             * Event is not required and update "Enabled"
-                             * D-Bus property of the hardware because
-                             * the hardware isolation record is not exist and
-                             * functional.
-                             */
-                            hw_isolation::utils::setEnabledProperty(
-                                _bus, hwInventoryPath->str, true);
-                            continue;
-                        }
-                        else if ((hwasState.deconfiguredByEid &
-                                  openpower_hw_status::DeconfiguredByReason::
-                                      DECONFIGURED_BY_PLID_MASK) != 0)
-                        {
-                            /**
-                             * Event is required since the hardware is
-                             * temporarily isolated by the error.
-                             */
-                            auto eId = hwasState.deconfiguredByEid;
-                            eventMsg = "Error";
-                            eventSeverity = event::EventSeverity::Critical;
-
-                            auto logObjPath = utils::getBMCLogPath(_bus, eId);
-                            if (!logObjPath.has_value())
-                            {
-                                log<level::ERR>(
-                                    fmt::format(
-                                        "Skipping to create the hardware "
-                                        "status event because unable to "
-                                        "find the bmc error log object path "
-                                        "for the given deconfiguration EID "
-                                        "[{}] which isolated the hardware ",
-                                        "[{}]", eId, hwInventoryPath->str)
-                                        .c_str());
-                                error_log::createErrorLog(
-                                    error_log::HwIsolationGenericErrMsg,
-                                    error_log::Level::Informational,
-                                    error_log::CollectTraces);
-                                continue;
-                            }
-                            eventErrLogPath = logObjPath->str;
-                        }
                         else
                         {
                             /**
-                             * Event is required since the hardware is
-                             * temporarily isolated by the respective
-                             * deconfigured reason.
+                             * Update the "Enabled" property of the hardware
+                             * because, we should allow to manually deconfigure
+                             * a hardware with the hw-isolation record.
                              */
-                            auto dfgReason = openpower_hw_status::
-                                convertDeconfiguredByReasonFromEnum(
-                                    static_cast<openpower_hw_status::
-                                                    DeconfiguredByReason>(
-                                        hwasState.deconfiguredByEid));
-                            eventMsg = std::get<0>(dfgReason);
-                            eventSeverity = std::get<1>(dfgReason);
+                            hw_isolation::utils::setEnabledProperty(
+                                _bus, hwInventoryPath->str, true);
+
+                            if (hwasState.functional)
+                            {
+                                // Event is not required since it is functional
+                                continue;
+                            }
+
+                            if ((hwasState.deconfiguredByEid &
+                                 openpower_hw_status::DeconfiguredByReason::
+                                     DECONFIGURED_BY_PLID_MASK) != 0)
+                            {
+                                /**
+                                 * Event is required since the hardware is
+                                 * temporarily isolated by the error.
+                                 */
+                                auto eId = hwasState.deconfiguredByEid;
+                                eventMsg = "Error";
+                                eventSeverity = event::EventSeverity::Critical;
+
+                                auto logObjPath =
+                                    utils::getBMCLogPath(_bus, eId);
+                                if (!logObjPath.has_value())
+                                {
+                                    log<level::ERR>(
+                                        fmt::format(
+                                            "Skipping to create the hardware "
+                                            "status event because unable to "
+                                            "find the bmc error log object "
+                                            "path for the given "
+                                            "deconfiguration EID [{}] which "
+                                            "isolated the hardware [{}]",
+                                            eId, hwInventoryPath->str)
+                                            .c_str());
+                                    error_log::createErrorLog(
+                                        error_log::HwIsolationGenericErrMsg,
+                                        error_log::Level::Informational,
+                                        error_log::CollectTraces);
+                                    continue;
+                                }
+                                eventErrLogPath = logObjPath->str;
+                            }
+                            else
+                            {
+                                /**
+                                 * Event is required since the hardware is
+                                 * temporarily isolated by the respective
+                                 * deconfigured reason.
+                                 */
+                                auto dfgReason = openpower_hw_status::
+                                    convertDeconfiguredByReasonFromEnum(
+                                        static_cast<openpower_hw_status::
+                                                        DeconfiguredByReason>(
+                                            hwasState.deconfiguredByEid));
+                                eventMsg = std::get<0>(dfgReason);
+                                eventSeverity = std::get<1>(dfgReason);
+                            }
                         }
 
                         auto eventObjPath =
