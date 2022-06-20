@@ -127,12 +127,14 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
      * external interface i.e Redfish
      */
     constexpr auto enabledPropIface = "xyz.openbmc_project.Object.Enable";
+    constexpr auto enabledPropName = "Enabled";
 
     // Using two try and catch block to avoid more trace for same issue
     // since using common utils API "setDBusPropertyVal"
+    std::string serviceName{};
     try
     {
-        getDBusServiceName(bus, dbusObjPath, enabledPropIface);
+        serviceName = getDBusServiceName(bus, dbusObjPath, enabledPropIface);
     }
     catch (const sdbusplus::exception::SdBusError& e)
     {
@@ -147,8 +149,44 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
 
     try
     {
-        setDBusPropertyVal<bool>(bus, dbusObjPath, enabledPropIface, "Enabled",
-                                 enabledPropVal);
+        if (serviceName == "xyz.openbmc_project.Inventory.Manager")
+        {
+            using PropertyValue = std::variant<bool>;
+            using PropertyMap = std::map<std::string, PropertyValue>;
+            using InterfaceMap = std::map<std::string, PropertyMap>;
+            using ObjectValueTree =
+                std::map<sdbusplus::message::object_path, InterfaceMap>;
+
+            ObjectValueTree objectValueTree;
+            InterfaceMap interfaceMap;
+            PropertyMap propertyMap;
+            propertyMap.emplace(enabledPropName, enabledPropVal);
+            interfaceMap.emplace(enabledPropIface, propertyMap);
+
+            const std::string inventryMgrObjPath{
+                "/xyz/openbmc_project/inventory"};
+
+            std::string objPath(dbusObjPath);
+            if (dbusObjPath.starts_with(inventryMgrObjPath))
+            {
+                // Remove PIM root object path in the given object path
+                // to avoid wrong object tree under the PIM root object path.
+                objPath.erase(0, inventryMgrObjPath.length());
+            }
+            objectValueTree.emplace(std::move(objPath),
+                                    std::move(interfaceMap));
+
+            auto method = bus.new_method_call(
+                serviceName.c_str(), inventryMgrObjPath.c_str(),
+                "xyz.openbmc_project.Inventory.Manager", "Notify");
+            method.append(std::move(objectValueTree));
+            bus.call_noreply(method);
+        }
+        else
+        {
+            setDBusPropertyVal<bool>(bus, dbusObjPath, enabledPropIface,
+                                     enabledPropName, enabledPropVal);
+        }
     }
     catch (const sdbusplus::exception::SdBusError& e)
     {
