@@ -503,7 +503,7 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record,
 
         auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
 
-        if (!bmcErrorLogPath.has_value())
+        if (!isRestorePath && !bmcErrorLogPath.has_value())
         {
             log<level::ERR>(
                 fmt::format(
