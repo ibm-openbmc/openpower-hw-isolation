@@ -502,17 +502,24 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record,
         updateEcoCoresList(ecoCore, entityPathRawData);
 
         auto bmcErrorLogPath = utils::getBMCLogPath(_bus, record.elogId);
-
-        if (!isRestorePath && !bmcErrorLogPath.has_value())
+        std::string strBmcErrorLogPath{};
+        if (!bmcErrorLogPath.has_value())
         {
-            log<level::ERR>(
-                fmt::format(
-                    "Skipping to restore a given isolated "
-                    "hardware [{}] : Due to failure to get BMC error log path "
-                    "by isolated hardware EID (aka PEL ID) [{}]",
-                    ss.str(), record.elogId)
-                    .c_str());
-            return;
+            if (!isRestorePath)
+            {
+                log<level::ERR>(
+                    fmt::format("Skipping to restore a given isolated "
+                                "hardware [{}] : Due to failure to get BMC "
+                                "error log path "
+                                "by isolated hardware EID (aka PEL ID) [{:#X}]",
+                                ss.str(), record.elogId)
+                        .c_str());
+                return;
+            }
+        }
+        else
+        {
+            strBmcErrorLogPath = bmcErrorLogPath->str;
         }
 
         auto entrySeverity = entry::utils::getEntrySeverityType(
@@ -530,8 +537,8 @@ void Manager::createEntryForRecord(const openpower_guard::GuardRecord& record,
 
         auto entryPath =
             createEntry(record.recordId, resolved, *entrySeverity,
-                        isolatedHwInventoryPath->str, bmcErrorLogPath->str,
-                        false, record.targetId);
+                        isolatedHwInventoryPath->str, strBmcErrorLogPath, false,
+                        record.targetId);
 
         if (!entryPath.has_value())
         {
