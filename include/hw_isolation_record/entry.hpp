@@ -204,7 +204,8 @@ class Entry :
         // Must be ordered based on the serialization to deserialize.
         archive(persistedEntityPathRawData, persistedElapsed);
 
-        if (openpower_guard::EntityPath(persistedEntityPathRawData.data()) ==
+        if (openpower_guard::EntityPath(persistedEntityPathRawData.data(),
+                                        persistedEntityPathRawData.size()) ==
             _entityPath)
         {
             // Skip to send property change signal in the restore path.

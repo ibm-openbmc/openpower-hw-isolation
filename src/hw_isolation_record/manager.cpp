@@ -328,8 +328,10 @@ sdbusplus::message::object_path Manager::create(
         throw type::CommonError::InvalidArgument();
     }
 
-    auto guardRecord =
-        openpower_guard::create(devTreePhysicalPath->data(), 0, *guardType);
+    auto guardRecord = openpower_guard::create(
+        openpower_guard::EntityPath(devTreePhysicalPath->data(),
+                                    devTreePhysicalPath->size()),
+        0, *guardType);
 
     if (auto ret = updateEntry(guardRecord->recordId, severity,
                                isolateHardware.str, "", guardRecord->targetId);
@@ -387,8 +389,10 @@ sdbusplus::message::object_path Manager::createWithErrorLog(
         throw type::CommonError::InvalidArgument();
     }
 
-    auto guardRecord =
-        openpower_guard::create(devTreePhysicalPath->data(), *eId, *guardType);
+    auto guardRecord = openpower_guard::create(
+        openpower_guard::EntityPath(devTreePhysicalPath->data(),
+                                    devTreePhysicalPath->size()),
+        *eId, *guardType);
 
     if (auto ret =
             updateEntry(guardRecord->recordId, severity, isolateHardware.str,
@@ -677,7 +681,8 @@ void Manager::cleanupPersistedEcoCores()
             auto isNotIsolated = std::ranges::none_of(
                 _isolatedHardwares, [ecoCore](const auto& entry) {
                     return (entry.second->getEntityPath() ==
-                            openpower_guard::EntityPath(ecoCore->data()));
+                            openpower_guard::EntityPath(ecoCore->data(),
+                                                        ecoCore->size()));
                 });
 
             if (isNotIsolated)
@@ -905,8 +910,9 @@ sdbusplus::message::object_path Manager::createWithEntityPath(
         throw type::CommonError::InvalidArgument();
     }
 
-    auto guardRecord =
-        openpower_guard::create(entityPath.data(), *eId, *guardType);
+    auto guardRecord = openpower_guard::create(
+        openpower_guard::EntityPath(entityPath.data(), entityPath.size()), *eId,
+        *guardType);
 
     if (auto ret = updateEntry(guardRecord->recordId, severity,
                                isolateHwInventoryPath->str, bmcErrorLog.str,
