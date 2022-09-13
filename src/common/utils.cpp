@@ -143,8 +143,18 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
         {
             return;
         }
-        throw sdbusplus::exception::SdBusError(
-            const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+        // TODO:https://github.com/ibm-openbmc/openpower-hw-isolation/issues/39
+        // During "core" checkstop PLDM will be blocked on the DMA transfer of
+        // the dump data and might not honor enabling D-Bus property of core
+        // D-Bus object during hw-isolation entry creation. PLDM hosts
+        // the "core" D-Bus object and request need to be sent to PLDM for
+        // property change request. For now, ignoring the exception thrown, the
+        // property will be enabled again during refresh.
+        // throw sdbusplus::exception::SdBusError(
+        //    const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+        log<level::ERR>(
+            fmt::format("Exception [{}], failed to get service name", e.what())
+                .c_str());
     }
 
     try
@@ -195,8 +205,19 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
         {
             return;
         }
-        throw sdbusplus::exception::SdBusError(
-            const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+        // TODO:https://github.com/ibm-openbmc/openpower-hw-isolation/issues/39
+        // During "core" checkstop PLDM will be blocked on the DMA transfer of
+        // the dump data and might not honor enabling D-Bus property of core
+        // D-Bus object during hw-isolation entry creation. PLDM hosts
+        // the "core" D-Bus object and request need to be sent to PLDM for
+        // property change request. For now, ignoring the exception thrown, the
+        // property will be enabled again during refresh.
+        // throw sdbusplus::exception::SdBusError(
+        //    const_cast<sd_bus_error*>(e.get_error()), "HW-Isolation");
+        log<level::ERR>(
+            fmt::format("Exception [{}], failed to set enable D-Bus property",
+                        e.what())
+                .c_str());
     }
 }
 
