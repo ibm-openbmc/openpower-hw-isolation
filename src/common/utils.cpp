@@ -52,7 +52,14 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
 
     // In OpenBMC, the object path will be hosted by a single service
     // i.e more than one service cannot host the same object path.
-    if (servicesName.size() > 1)
+    // Note that for legacy reasons, phosphor-state-manager registers two
+    // service names, xyz.openbmc_project.State.Host and
+    // xyz.openbmc_project.State.Host0. This was to support multi-host
+    // designs but also support legacy users. This is the one exception
+    // to the "more than one service" rule
+    if ((servicesName.size() > 1) &&
+        (servicesName[0].first.find("xyz.openbmc_project.State.Host") ==
+         std::string::npos))
     {
         std::string serviceNameList{""};
 
