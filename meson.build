@@ -113,3 +113,5 @@ configure_file(
     install_dir: systemd_system_unit_dir,
     output: '@PLAINNAME@'
     )
+
+subdir('src')
