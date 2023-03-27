@@ -6,6 +6,8 @@
 
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
 
+#include <unordered_set>
+
 namespace hw_isolation
 {
 namespace utils
@@ -52,15 +54,29 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
 
     // In OpenBMC, the object path will be hosted by a single service
     // i.e more than one service cannot host the same object path.
-    // Note that for legacy reasons, phosphor-state-manager registers two
-    // service names, xyz.openbmc_project.State.Host and
-    // xyz.openbmc_project.State.Host0. This was to support multi-host
-    // designs but also support legacy users. This is the one exception
-    // to the "more than one service" rule
-    if ((servicesName.size() > 1) &&
-        (servicesName[0].first.find("xyz.openbmc_project.State.Host") ==
-         std::string::npos))
+    if (servicesName.size() > 1)
     {
+        // Note that for legacy reasons, phosphor-state-manager registers two
+        // service names, (xyz.openbmc_project.State.Host and
+        // xyz.openbmc_project.State.Host0) or
+        // (xyz.openbmc_project.State.Chassis and
+        // xyz.openbmc_project.State.Chassis0). This was to support multi-host
+        // designs but also support legacy users. This is the one exception
+        // to the "more than one service" rule
+        auto isExceptionService = [](const auto& serviceName) {
+            std::unordered_set<std::string> exceptionServices(
+                {"xyz.openbmc_project.State.Host",
+                 "xyz.openbmc_project.State.Chassis"});
+
+            return exceptionServices.contains(serviceName.first);
+        };
+
+        if (auto it = std::ranges::find_if(servicesName, isExceptionService);
+            it != servicesName.end())
+        {
+            return it->first;
+        }
+
         std::string serviceNameList{""};
 
         std::for_each(servicesName.begin(), servicesName.end(),
@@ -68,10 +84,13 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                           serviceNameList.append(serviceName.first + ",");
                       });
 
-        log<level::ERR>(fmt::format("The given object path hosted by "
-                                    "more than one services [{}]",
-                                    serviceNameList)
-                            .c_str());
+        log<level::ERR>(
+            fmt::format(
+                "The given object path [{}] and interface [{}] hosted by "
+                "more than one services [{}]",
+                path, interface, serviceNameList)
+                .c_str());
+
         throw std::runtime_error(
             "Given object path hosted by more than one service");
     }
