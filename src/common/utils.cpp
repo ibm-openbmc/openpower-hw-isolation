@@ -22,6 +22,18 @@ void initExternalModules()
     openpower_guard::libguard::libguard_init(false);
 }
 
+bool isNotStateHostService(std::string firstString)
+{
+    return (firstString.find("xyz.openbmc_project.State.Host") ==
+            std::string::npos);
+}
+
+bool isNotStateChassisService(std::string firstString)
+{
+    return (firstString.find("xyz.openbmc_project.State.Chassis") ==
+            std::string::npos);
+}
+
 std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                                const std::string& path,
                                const std::string& interface)
@@ -53,13 +65,14 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
     // In OpenBMC, the object path will be hosted by a single service
     // i.e more than one service cannot host the same object path.
     // Note that for legacy reasons, phosphor-state-manager registers two
-    // service names, xyz.openbmc_project.State.Host and
-    // xyz.openbmc_project.State.Host0. This was to support multi-host
+    // service names, (xyz.openbmc_project.State.Host and
+    // xyz.openbmc_project.State.Host0) or (xyz.openbmc_project.State.Chassis
+    // and xyz.openbmc_project.State.Chassis0). This was to support multi-host
     // designs but also support legacy users. This is the one exception
     // to the "more than one service" rule
     if ((servicesName.size() > 1) &&
-        (servicesName[0].first.find("xyz.openbmc_project.State.Host") ==
-         std::string::npos))
+        isNotStateHostService(servicesName[0].first) &&
+        isNotStateChassisService(servicesName[0].first))
     {
         std::string serviceNameList{""};
 
@@ -69,8 +82,9 @@ std::string getDBusServiceName(sdbusplus::bus::bus& bus,
                       });
 
         log<level::ERR>(fmt::format("The given object path hosted by "
-                                    "more than one services [{}]",
-                                    serviceNameList)
+                                    "more than one services [{}]"
+                                    "for object path [{}] and interface [{}]",
+                                    serviceNameList, path, interface)
                             .c_str());
         throw std::runtime_error(
             "Given object path hosted by more than one service");
