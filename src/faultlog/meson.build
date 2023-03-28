@@ -31,7 +31,8 @@ systemd_dep = dependency('systemd')
 faultlog_sources = [ 
         'fault_log_main.cpp',
         'faultlog_records.cpp',
-        'servicable_records.cpp'
+        'servicable_records.cpp',
+        'faultlog_policy.cpp'
         ]
 
 faultlog_dependencies = [ 

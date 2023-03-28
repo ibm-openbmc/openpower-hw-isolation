@@ -1,3 +1,4 @@
+#include <faultlog_policy.hpp>
 #include <faultlog_records.hpp>
 #include <nlohmann/json.hpp>
 #include <sdbusplus/bus.hpp>
@@ -19,6 +20,7 @@ int main(int /*arg*/, char** /*argv*/)
 
         // add hardware isolation records to json file
         FaultLogRecords::populate(bus, faultLogJson, processedEid);
+        FaultLogPolicy::populate(bus, faultLogJson);
         std::cout << "Nag data is " << std::endl;
         std::cout << faultLogJson.dump(2) << std::endl;
     }
