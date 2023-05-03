@@ -1,7 +1,5 @@
 [Unit]
 Description=Faultlog application
-Wants=xyz.openbmc_project.Dump.Manager.service
-After=xyz.openbmc_project.Dump.Manager.service
 Wants=mapper-wait@-xyz-openbmc_project-inventory.service
 After=mapper-wait@-xyz-openbmc_project-inventory.service
 Wants=org.open_power.HardwareIsolation.service
