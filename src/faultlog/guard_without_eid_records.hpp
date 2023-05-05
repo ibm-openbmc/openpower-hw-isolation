@@ -28,7 +28,7 @@ class GuardWithoutEidRecords
      *
      *  @param[in] guardRecords - Guard records
      */
-    static int getCount(GuardRecords& guardRecords);
+    static int getCount(const GuardRecords& guardRecords);
 
     /** @brief Captured deconfig data in NAG JSON file
      *

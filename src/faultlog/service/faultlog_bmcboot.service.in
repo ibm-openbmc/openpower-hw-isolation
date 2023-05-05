@@ -15,7 +15,10 @@ After=obmc-power-on@%0.target
 Conflicts=obmc-power-off@%0.target
 
 [Service]
-ExecStart=@bindir@/faultlog -c
+PIDFile=/run/faultlog.pid
+ExecStartPre=/bin/bash -c '/usr/bin/test -e /run/faultlog.pid && /bin/echo "Service already running" && /bin/false || /bin/true'
+ExecStart=@bindir@/faultlog -r
+ExecStop=/bin/rm -f /run/faultlog.pid
 Type=oneshot
 SyslogIdentifier=faultlog
 

@@ -3,6 +3,9 @@
 #include <libguard/include/guard_record.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/bus.hpp>
+#include <xyz/openbmc_project/State/Boot/Progress/server.hpp>
+#include <xyz/openbmc_project/State/Host/server.hpp>
+
 using ::openpower::guard::GuardRecords;
 
 namespace openpower::faultlog
@@ -44,7 +47,7 @@ T readProperty(sdbusplus::bus::bus& bus, const std::string& service,
 }
 
 /**
- * @brief get the guard reason for the specified physical path
+ * @brief Get the guard reason for the specified physical path
  *        of the pdbg target
  * @param[in] guardRecords - guard records
  * @param[in] path - physical path of the pdbg target
@@ -53,5 +56,28 @@ T readProperty(sdbusplus::bus::bus& bus, const std::string& service,
  */
 std::string getGuardReason(const GuardRecords& guardRecords,
                            const std::string& path);
+
+/**
+ * @brief Return true if host completed IPL and reached runtime
+ * @param[in] bus - D-Bus handle
+ *
+ * @return true if in runtime else false
+ */
+bool isHostProgressStateRunning(sdbusplus::bus::bus& bus);
+
+/**
+ * @brief Return true if host started running
+ * @param[in] bus - D-Bus handle
+ *
+ * @return true if host started
+ */
+bool isHostStateRunning(sdbusplus::bus::bus& bus);
+
+/**
+ * @brief Return true if host started and has applied guard recrods
+ * @param[in] bus - D-Bus handle
+ * @return true if host has applied guard records else false
+ */
+bool isHostAppliedGuardRecords(sdbusplus::bus::bus& bus);
 
 } // namespace openpower::faultlog

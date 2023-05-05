@@ -11,9 +11,13 @@ After=com.ibm.VPD.Manager.service
 
 Wants=obmc-host-started@%0.target
 After=obmc-host-started@%0.target
+Conflicts=obmc-host-stop@%i.target
 
 [Service]
-ExecStart=@bindir@/faultlog -c
+PIDFile=/run/faultlog.pid
+ExecStartPre=/bin/bash -c '/usr/bin/test -e /run/faultlog.pid && /bin/echo "Service already running" && /bin/false || /bin/true'
+ExecStart=@bindir@/faultlog -p
+ExecStop=/bin/rm -f /run/faultlog.pid
 Type=oneshot
 SyslogIdentifier=faultlog
 
