@@ -1,4 +1,5 @@
 #include "xyz/openbmc_project/Logging/Entry/server.hpp"
+
 #include <CLI/CLI.hpp>
 #include <deconfig_records.hpp>
 #include <faultlog_policy.hpp>
@@ -25,6 +26,54 @@ using Severity = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 
 using Binary = std::vector<uint8_t>;
 using PropVariant = sdbusplus::utility::dedup_variant_t<Binary>;
+
+/** @brief Helper method to create faultlog pel
+ *
+ *  @param[in] bus - D-Bus to attach to
+ *  @param[in] guardRecords - hardware isolated records to parse
+ */
+void createNagPel(sdbusplus::bus::bus& bus,
+                  const GuardRecords& unresolvedRecords)
+{
+    int guardCount = GuardWithEidRecords::getCount(unresolvedRecords);
+    int manualGuardCount = GuardWithoutEidRecords::getCount(unresolvedRecords);
+    int unresolvedPelsCount = UnresolvedPELs::getCount(bus);
+    int deconfigCount = DeconfigRecords::getCount();
+
+    if ((guardCount > 0) || (manualGuardCount > 0) ||
+        (unresolvedPelsCount > 0) || (deconfigCount > 0))
+    {
+        std::unordered_map<std::string, std::string> data = {
+            {"GUARD_WITH_ASSOC_ERROR_COUNT", std::to_string(guardCount)},
+            {"GUARD_WITH_NO_ASSOC_ERROR_COUNT",
+             std::to_string(manualGuardCount)},
+            {"UNRESOLVED_PEL_WITH_DECONFIG_BIT_COUNT",
+             std::to_string(unresolvedPelsCount)},
+            {"DECONFIG_RECORD_COUNT", std::to_string(deconfigCount)}};
+
+        auto method = bus.new_method_call(
+            "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+            "xyz.openbmc_project.Logging.Create", "Create");
+        method.append("org.open_power.Faultlog.Error.DeconfiguredHW",
+                      Severity::Error, data);
+        auto reply = method.call();
+        if (reply.is_method_error())
+        {
+            lg2::error("Error in calling D-Bus method to create PEL");
+        }
+        lg2::info("faultlog {GUARD_COUNT}, {MAN_GUARD_COUNT}, "
+                  "{DECONFIG_COUNT} , {PEL_COUNT} ",
+                  "GUARD_COUNT", guardCount, "MAN_GUARD_COUNT",
+                  manualGuardCount, "DECONFIG_COUNT", deconfigCount,
+                  "PEL_COUNT", unresolvedPelsCount);
+    }
+    else
+    {
+        lg2::info("There are no pending service actions ignoring "
+                  "creating fautlog pel");
+    }
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -84,6 +133,7 @@ int main(int argc, char** argv)
         bool deconfig = false;
         bool createPel = false;
         bool listFaultlog = false;
+        bool bmcReboot = false;
 
         app.set_help_flag("-h, --help", "Faultlog tool options");
         app.add_flag("-g, --guardwterr", guardWithEid,
@@ -101,6 +151,10 @@ int main(int argc, char** argv)
                      "Populate deconfigured target details to JSON");
         app.add_flag("-c, --createPel", createPel,
                      "Create faultlog pel if there are guarded/deconfigured "
+                     "records present");
+        app.add_flag("-r, --reboot", bmcReboot,
+                     "Create faultlog pel during reboot if there are "
+                     "guarded/deconfigured "
                      "records present");
         app.add_flag("-f, --faultlog", listFaultlog,
                      "List all fault log records in JSON format");
@@ -143,46 +197,26 @@ int main(int argc, char** argv)
         // create fault log pel if there are service actions pending
         else if (createPel)
         {
-            int guardCount = GuardWithEidRecords::getCount(unresolvedRecords);
-            int manualGuardCount =
-                GuardWithoutEidRecords::getCount(unresolvedRecords);
-            int unresolvedPelsCount = UnresolvedPELs::getCount(bus);
-            int deconfigCount = DeconfigRecords::getCount();
-
-            if ((guardCount > 0) || (manualGuardCount > 0) ||
-                (unresolvedPelsCount > 0) || (deconfigCount > 0))
+            createNagPel(bus, unresolvedRecords);
+        }
+        // create bmc reboot pel
+        else if (bmcReboot)
+        {
+            // interested only in bmc reboot, host should have been in IPL
+            // runtime during bmc reboot
+            if (!isHostStateRunning(bus)) // host started
             {
-                std::unordered_map<std::string, std::string> data;
-                data.emplace("GUARD_WITH_ASSOC_ERROR_COUNT",
-                             std::to_string(guardCount));
-                data.emplace("GUARD_WITH_NO_ASSOC_ERROR_COUNT",
-                             std::to_string(manualGuardCount));
-                data.emplace("UNRESOLVED_PEL_WITH_DECONFIG_BIT_COUNT",
-                             std::to_string(unresolvedPelsCount));
-                data.emplace("DECONFIG_RECORD_COUNT",
-                             std::to_string(deconfigCount));
+                lg2::info("Ignore, host is not started so not bmc reboot");
+            }
 
-                auto method = bus.new_method_call(
-                    "xyz.openbmc_project.Logging",
-                    "/xyz/openbmc_project/logging",
-                    "xyz.openbmc_project.Logging.Create", "Create");
-                method.append("org.open_power.Faultlog.Error.DeconfiguredHW",
-                              Severity::Error, data);
-                auto reply = method.call();
-                if (reply.is_method_error())
-                {
-                    lg2::error("Error in calling D-Bus method to create PEL");
-                }
-                lg2::info("faultlog {GUARD_COUNT}, {MAN_GUARD_COUNT}, "
-                          "{DECONFIG_COUNT} , {PEL_COUNT} ",
-                          "GUARD_COUNT", guardCount, "MAN_GUARD_COUNT",
-                          manualGuardCount, "DECONFIG_COUNT", deconfigCount,
-                          "PEL_COUNT", unresolvedPelsCount);
+            else if (!isHostProgressStateRunning(bus)) // host in ipl runtime
+            {
+                lg2::info(
+                    "Ignore, host is not in running state not bmc reboot");
             }
             else
             {
-                lg2::info("There are no pending service actions ignoring "
-                          "creating fautlog pel");
+                createNagPel(bus, unresolvedRecords);
             }
         }
         // write faultlog json to stdout
