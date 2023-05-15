@@ -74,6 +74,57 @@ void createNagPel(sdbusplus::bus::bus& bus,
     }
 }
 
+/** @brief Callback method for boot progress property change
+ *
+ *  @param[in] bus - D-Bus to attach to
+ *  @param[in] unresolvedRecords - hardware isolated records to parse
+ *  @param[in] msg - property change D-Bus message
+ */
+void propertyChanged(sdbusplus::bus::bus& bus,
+                     const GuardRecords& unresolvedRecords,
+                     const sdbusplus::message::message& msg)
+{
+    using ProgressStages = sdbusplus::xyz::openbmc_project::State::Boot::
+        server::Progress::ProgressStages;
+    using PropertiesVariant =
+        sdbusplus::utility::dedup_variant_t<ProgressStages>;
+    using Properties = std::map<std::string, PropertiesVariant>;
+    std::string intf;
+    Properties propMap;
+    msg.read(intf, propMap);
+    for (const auto& [prop, propValue] : propMap)
+    {
+        if (prop == "BootProgress")
+        {
+            const ProgressStages* progPtr =
+                std::get_if<ProgressStages>(&propValue);
+            if (progPtr != nullptr)
+            {
+                lg2::info("faultlog - host poweron check boot progress "
+                          "value is "
+                          "{BOOT_PROGRESS}",
+                          "BOOT_PROGRESS", *progPtr);
+                if ((*progPtr == ProgressStages::SystemInitComplete) ||
+                    (*progPtr == ProgressStages::SystemSetup) ||
+                    (*progPtr == ProgressStages::OSStart) ||
+                    (*progPtr == ProgressStages::OSRunning))
+                {
+                    lg2::info("faultlog - host poweron host reached "
+                              "apply guard state creating nag pel");
+                    createNagPel(bus, unresolvedRecords);
+                    exit(EXIT_SUCCESS);
+                }
+            }
+            else
+            {
+                lg2::error("Invalid property value while reading boot "
+                           "progress");
+                exit(EXIT_FAILURE);
+            }
+        }
+    }
+}
+
 int main(int argc, char** argv)
 {
     try
@@ -92,7 +143,8 @@ int main(int argc, char** argv)
         {
             auto retVal = readProperty<PropVariant>(
                 bus, "xyz.openbmc_project.Inventory.Manager",
-                "/xyz/openbmc_project/inventory/system/chassis/motherboard",
+                "/xyz/openbmc_project/inventory/system/chassis/"
+                "motherboard",
                 "com.ibm.ipzvpd.VSYS", "TM");
             if (auto pVal = std::get_if<Binary>(&retVal))
             {
@@ -112,9 +164,9 @@ int main(int argc, char** argv)
         faultLogJson.push_back(systemHdr);
 
         openpower::guard::libguard_init();
-        // Don't get ephemeral records because those type records are not
-        // intended to expose to the end user, just created for internal purpose
-        // to use by the BMC and Hostboot.
+        // Don't get ephemeral records because those type records are
+        // not intended to expose to the end user, just created for
+        // internal purpose to use by the BMC and Hostboot.
         openpower::guard::GuardRecords records = openpower::guard::getAll(true);
         GuardRecords unresolvedRecords;
         // filter out all unused or resolved records
@@ -134,6 +186,7 @@ int main(int argc, char** argv)
         bool createPel = false;
         bool listFaultlog = false;
         bool bmcReboot = false;
+        bool hostPowerOn = false;
 
         app.set_help_flag("-h, --help", "Faultlog tool options");
         app.add_flag("-g, --guardwterr", guardWithEid,
@@ -142,11 +195,11 @@ int main(int argc, char** argv)
         app.add_flag("-m, --guardmanual", guardWithoutEid,
                      "Populate guard records without associated error objects "
                      "details to JSON");
-        app.add_flag("-p, --policy", policy,
+        app.add_flag("-l, --policy", policy,
                      "Populate faultlog policy and FCO values to JSON");
-        app.add_flag(
-            "-u, --unresolvedPels", unresolvedPels,
-            "Populate unresolved pels with deconfig bit set details to JSON");
+        app.add_flag("-u, --unresolvedPels", unresolvedPels,
+                     "Populate unresolved pels with deconfig bit set "
+                     "details to JSON");
         app.add_flag("-d, --deconfig", deconfig,
                      "Populate deconfigured target details to JSON");
         app.add_flag("-c, --createPel", createPel,
@@ -154,6 +207,10 @@ int main(int argc, char** argv)
                      "records present");
         app.add_flag("-r, --reboot", bmcReboot,
                      "Create faultlog pel during reboot if there are "
+                     "guarded/deconfigured "
+                     "records present");
+        app.add_flag("-p, --hostpoweron", hostPowerOn,
+                     "Create faultlog pel during host power-on if there are "
                      "guarded/deconfigured "
                      "records present");
         app.add_flag("-f, --faultlog", listFaultlog,
@@ -202,8 +259,8 @@ int main(int argc, char** argv)
         // create bmc reboot pel
         else if (bmcReboot)
         {
-            // interested only in bmc reboot, host should have been in IPL
-            // runtime during bmc reboot
+            // interested only in bmc reboot, host should have been in
+            // IPL runtime during bmc reboot
             if (!isHostStateRunning(bus)) // host started
             {
                 lg2::info("Ignore, host is not started so not bmc reboot");
@@ -211,12 +268,35 @@ int main(int argc, char** argv)
 
             else if (!isHostProgressStateRunning(bus)) // host in ipl runtime
             {
-                lg2::info(
-                    "Ignore, host is not in running state not bmc reboot");
+                lg2::info("Ignore, host is not in running state not "
+                          "bmc reboot");
             }
             else
             {
                 createNagPel(bus, unresolvedRecords);
+            }
+        }
+        else if (hostPowerOn)
+        {
+            if (isHostProgressStateRunning(bus))
+            {
+                createNagPel(bus, unresolvedRecords);
+            }
+            else
+            {
+                lg2::info("faultlog - hostpoweron creating watch "
+                          "for progress state");
+                std::unique_ptr<sdbusplus::bus::match_t> _hostStatePropWatch =
+                    std::make_unique<sdbusplus::bus::match_t>(
+                        bus,
+                        sdbusplus::bus::match::rules::propertiesChanged(
+                            "/xyz/openbmc_project/state/host0",
+                            "xyz.openbmc_project.State.Boot."
+                            "Progress"),
+                        [&bus, &unresolvedRecords](auto& msg) {
+                            propertyChanged(bus, unresolvedRecords, msg);
+                        });
+                bus.process_loop();
             }
         }
         // write faultlog json to stdout

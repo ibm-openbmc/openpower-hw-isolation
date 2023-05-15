@@ -71,5 +71,4 @@ bool isHostProgressStateRunning(sdbusplus::bus::bus& bus);
  * @return true if host started
  */
 bool isHostStateRunning(sdbusplus::bus::bus& bus);
-
 } // namespace openpower::faultlog
