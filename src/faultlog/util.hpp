@@ -1,15 +1,18 @@
 #pragma once
 
 #include <libguard/include/guard_record.hpp>
+#include <nlohmann/json.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/bus.hpp>
 #include <xyz/openbmc_project/State/Boot/Progress/server.hpp>
 #include <xyz/openbmc_project/State/Host/server.hpp>
-using ::openpower::guard::GuardRecords;
+
+#include <ctime>
 
 namespace openpower::faultlog
 {
-
+using ::nlohmann::json;
+using ::openpower::guard::GuardRecords;
 /**
  * @brief Read property value from the specified object and interface
  * @param[in] bus D-Bus handle
@@ -71,4 +74,22 @@ bool isHostProgressStateRunning(sdbusplus::bus::bus& bus);
  * @return true if host started
  */
 bool isHostStateRunning(sdbusplus::bus::bus& bus);
+
+/**
+ * @brief Return time in BCD from milliSeconds since epoch time
+ * @param[in] milliSeconds - milli seconds since epoch time
+ *
+ * @return string time value in string format
+ */
+std::string epochTimeToBCD(uint64_t milliSeconds);
+
+/**
+ * @brief Parse the callout values from the logging Resolution property
+ *
+ * @param[in] callout - callouts string
+ *
+ * @return Json object as per NAG specification for callouts
+ */
+json parseCallout(const std::string callout);
+
 } // namespace openpower::faultlog

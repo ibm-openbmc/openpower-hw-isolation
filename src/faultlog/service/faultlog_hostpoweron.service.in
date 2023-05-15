@@ -11,11 +11,12 @@ After=mapper-wait@-xyz-openbmc_project-logging.service
 Wants=com.ibm.VPD.Manager.service
 After=com.ibm.VPD.Manager.service
 
-Wants=obmc-host-started@%0.target
-After=obmc-host-started@%0.target
+Wants=obmc-host-started@0.target
+After=obmc-host-started@0.target
+Conflicts=obmc-host-stop@0.target
 
 [Service]
-ExecStart=@bindir@/faultlog -c
+ExecStart=@bindir@/faultlog -p
 Type=oneshot
 SyslogIdentifier=faultlog
 

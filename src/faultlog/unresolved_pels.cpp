@@ -36,6 +36,18 @@ struct GuardedTarget
     {}
 };
 
+/**
+ * @brief Get PDBG target matching the guarded target physicalpath
+ *
+ * This callback function is called as part of the recursive method
+ * pdbg_target_traverse, recursion will exit when the method return 1
+ * else continues till the target is found
+ *
+ * @param[in] target - pdbg target to compare
+ * @param[inout] priv - data structure passed to the callback method
+ *
+ * @return 1 when target is found else 0
+ */
 static int getGuardedTarget(struct pdbg_target* target, void* priv)
 {
     // recursive callback function that exits when the target matching the
@@ -68,43 +80,57 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
         for (const auto& [path, interfaces] : objects)
         {
             bool resolved = true;
-            uint32_t id = 0;
             std::string severity =
                 "xyz.openbmc_project.Logging.Entry.Level.Informational";
+            bool deconfigured = false;
+            bool guarded = false;
             for (const auto& [intf, properties] : interfaces)
             {
-                if (intf != "xyz.openbmc_project.Logging.Entry")
+                if (intf == "xyz.openbmc_project.Logging.Entry")
                 {
-                    continue;
-                }
-                for (const auto& [prop, propValue] : properties)
-                {
-                    if (prop == "Id")
+                    for (const auto& [prop, propValue] : properties)
                     {
-                        auto idPtr = std::get_if<uint32_t>(&propValue);
-                        if (idPtr != nullptr)
+                        if (prop == "Resolved")
                         {
-                            id = *idPtr;
+                            auto resolvedPtr = std::get_if<bool>(&propValue);
+                            if (resolvedPtr != nullptr)
+                            {
+                                resolved = *resolvedPtr;
+                            }
                         }
-                    }
-                    else if (prop == "Resolved")
-                    {
-                        auto resolvedPtr = std::get_if<bool>(&propValue);
-                        if (resolvedPtr != nullptr)
+                        else if (prop == "Severity")
                         {
-                            resolved = *resolvedPtr;
-                        }
-                    }
-                    else if (prop == "Severity")
-                    {
-                        auto severityPtr = std::get_if<std::string>(&propValue);
-                        if (severityPtr != nullptr)
-                        {
-                            severity = *severityPtr;
+                            auto severityPtr =
+                                std::get_if<std::string>(&propValue);
+                            if (severityPtr != nullptr)
+                            {
+                                severity = *severityPtr;
+                            }
                         }
                     }
                 }
-                break;
+                else if (intf == "org.open_power.Logging.PEL.Entry")
+                {
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "Deconfig")
+                        {
+                            auto deconfigPtr = std::get_if<bool>(&propValue);
+                            if (deconfigPtr != nullptr)
+                            {
+                                deconfigured = *deconfigPtr;
+                            }
+                        }
+                        else if (prop == "Guard")
+                        {
+                            auto guardPtr = std::get_if<bool>(&propValue);
+                            if (guardPtr != nullptr)
+                            {
+                                guarded = *guardPtr;
+                            }
+                        }
+                    }
+                }
             }
             if (resolved == true)
             {
@@ -120,43 +146,14 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
                 continue;
             }
 
-            // get pel json file
-            std::string pel;
-            auto method2 = bus.new_method_call(
-                "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
-                "org.open_power.Logging.PEL", "GetPELJSON");
-            method2.append(id);
-            auto resp2 = bus.call(method2);
-            resp2.read(pel);
-            json pelJson = std::move(json::parse(pel));
-
-            bool deconfigured = false;
-            json& primarySRC = pelJson["Primary SRC"];
-            if (primarySRC.contains("Deconfigured") &&
-                !primarySRC["Deconfigured"].is_null())
-            {
-                if (primarySRC["Deconfigured"] == "True")
-                {
-                    deconfigured = true;
-                }
-            }
             if (deconfigured == false)
             {
                 continue;
             }
 
-            bool guarded = false;
-            if (primarySRC.contains("Guarded") &&
-                !primarySRC["Guarded"].is_null())
+            if (guarded == true) // will be captured as part of guard records
             {
-                if (primarySRC["Guarded"] == "True")
-                {
-                    guarded = true;
-                }
-            }
-            if (guarded == true)
-            {
-                continue; // will be captured as part of guard records
+                continue;
             }
             count += 1;
         }
@@ -191,43 +188,97 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
         for (const auto& [path, interfaces] : objects)
         {
             bool resolved = true;
-            uint32_t id = 0;
             std::string severity =
                 "xyz.openbmc_project.Logging.Entry.Level.Informational";
+            uint32_t plid = 0;
+            bool deconfigured = false;
+            bool guarded = false;
+            uint64_t timestamp = 0;
+            std::string callouts;
+            std::string refCode;
             for (const auto& [intf, properties] : interfaces)
             {
-                if (intf != "xyz.openbmc_project.Logging.Entry")
+                if (intf == "xyz.openbmc_project.Logging.Entry")
                 {
-                    continue;
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "Resolved")
+                        {
+                            auto resolvedPtr = std::get_if<bool>(&propValue);
+                            if (resolvedPtr != nullptr)
+                            {
+                                resolved = *resolvedPtr;
+                            }
+                        }
+                        else if (prop == "Severity")
+                        {
+                            auto severityPtr =
+                                std::get_if<std::string>(&propValue);
+                            if (severityPtr != nullptr)
+                            {
+                                severity = *severityPtr;
+                            }
+                        }
+                        else if (prop == "Resolution")
+                        {
+                            auto calloutsPtr =
+                                std::get_if<std::string>(&propValue);
+                            if (calloutsPtr != nullptr)
+                            {
+                                callouts = *calloutsPtr;
+                            }
+                        }
+                        else if (prop == "EventId")
+                        {
+                            auto eventIdPtr =
+                                std::get_if<std::string>(&propValue);
+                            if (eventIdPtr != nullptr)
+                            {
+                                std::istringstream iss(*eventIdPtr);
+                                iss >> refCode;
+                            }
+                        }
+                    }
                 }
-                for (const auto& [prop, propValue] : properties)
+                else if (intf == "org.open_power.Logging.PEL.Entry")
                 {
-                    if (prop == "Id")
+                    for (const auto& [prop, propValue] : properties)
                     {
-                        auto idPtr = std::get_if<uint32_t>(&propValue);
-                        if (idPtr != nullptr)
+                        if (prop == "PlatformLogID")
                         {
-                            id = *idPtr;
+                            auto plidPtr = std::get_if<uint32_t>(&propValue);
+                            if (plidPtr != nullptr)
+                            {
+                                plid = *plidPtr;
+                            }
                         }
-                    }
-                    else if (prop == "Resolved")
-                    {
-                        auto resolvedPtr = std::get_if<bool>(&propValue);
-                        if (resolvedPtr != nullptr)
+                        else if (prop == "Deconfig")
                         {
-                            resolved = *resolvedPtr;
+                            auto deconfigPtr = std::get_if<bool>(&propValue);
+                            if (deconfigPtr != nullptr)
+                            {
+                                deconfigured = *deconfigPtr;
+                            }
                         }
-                    }
-                    else if (prop == "Severity")
-                    {
-                        auto severityPtr = std::get_if<std::string>(&propValue);
-                        if (severityPtr != nullptr)
+                        else if (prop == "Guard")
                         {
-                            severity = *severityPtr;
+                            auto guardPtr = std::get_if<bool>(&propValue);
+                            if (guardPtr != nullptr)
+                            {
+                                guarded = *guardPtr;
+                            }
+                        }
+                        else if (prop == "Timestamp")
+                        {
+                            auto timestampPtr =
+                                std::get_if<uint64_t>(&propValue);
+                            if (timestampPtr != nullptr)
+                            {
+                                timestamp = *timestampPtr;
+                            }
                         }
                     }
                 }
-                break;
             }
             if (resolved == true)
             {
@@ -243,69 +294,34 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                 continue;
             }
 
-            // get pel json file
-            std::string pel;
-            auto method2 = bus.new_method_call(
-                "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
-                "org.open_power.Logging.PEL", "GetPELJSON");
-            method2.append(id);
-            auto resp2 = bus.call(method2);
-            resp2.read(pel);
-            json pelJson = std::move(json::parse(pel));
-
-            // add cec errorlog
-            json jsonErrorLog = json::object();
-            jsonErrorLog["Callout Section"] =
-                pelJson["Primary SRC"]["Callout Section"];
-            bool deconfigured = false;
-            json& primarySRC = pelJson["Primary SRC"];
-            if (primarySRC.contains("Deconfigured") &&
-                !primarySRC["Deconfigured"].is_null())
-            {
-                if (primarySRC["Deconfigured"] == "True")
-                {
-                    deconfigured = true;
-                }
-            }
             if (deconfigured == false)
             {
                 continue;
             }
 
-            bool guarded = false;
-            if (primarySRC.contains("Guarded") &&
-                !primarySRC["Guarded"].is_null())
-            {
-                if (primarySRC["Guarded"] == "True")
-                {
-                    guarded = true;
-                }
-            }
             if (guarded == true)
             {
                 continue; // will be captured as part of guard records
             }
 
-            jsonErrorLog["ERR_PLID"] =
-                pelJson["Private Header"]["Platform Log Id"];
-            jsonErrorLog["Callout Section"] =
-                pelJson["Primary SRC"]["Callout Section"];
-            jsonErrorLog["SRC"] = pelJson["Primary SRC"]["Reference Code"];
-            jsonErrorLog["DATE_TIME"] = pelJson["Private Header"]["Created at"];
+            // add cec errorlog
+            json jsonErrorLog = json::object();
+            std::stringstream ss;
+            ss << std::hex << plid;
+            jsonErrorLog["ERR_PLID"] = ss.str();
+            jsonErrorLog["Callout Section"] = parseCallout(callouts);
+            refCode.insert(0, "0x");
+            jsonErrorLog["SRC"] = refCode;
+            jsonErrorLog["DATE_TIME"] = epochTimeToBCD(timestamp);
 
             json jsonErrorLogSection = json::array();
             jsonErrorLogSection.push_back(std::move(jsonErrorLog));
-
-            std::string bmcLogIdStr =
-                pelJson["Private Header"]["Platform Log Id"];
-            uint32_t bmcLogId =
-                static_cast<uint32_t>(std::stoul(bmcLogIdStr, nullptr, 16));
 
             // add resource action check if guard record is found
             json jsonResource = json::object();
             for (const auto& elem : guardRecords)
             {
-                if (elem.elogId == bmcLogId)
+                if (elem.elogId == plid)
                 {
                     auto physicalPath =
                         openpower::guard::getPhysicalPath(elem.targetId);
