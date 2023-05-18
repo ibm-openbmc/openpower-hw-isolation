@@ -21,4 +21,4 @@ Type=oneshot
 SyslogIdentifier=faultlog
 
 [Install]
-WantedBy=obmc-host-startmin@0.target
+#WantedBy=obmc-host-startmin@0.target
