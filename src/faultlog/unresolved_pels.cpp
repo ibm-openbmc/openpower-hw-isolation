@@ -28,6 +28,7 @@ using Objects = std::map<sdbusplus::message::object_path, Interfaces>;
 constexpr auto stateConfigured = "CONFIGURED";
 constexpr auto stateDeconfigured = "DECONFIGURED";
 constexpr std::string pwrThermalErrPrefix = "1100";
+
 struct GuardedTarget
 {
     pdbg_target* target = nullptr;
@@ -66,6 +67,80 @@ static int getGuardedTarget(struct pdbg_target* target, void* priv)
     return 0;
 }
 
+/**
+ * @brief Return timestamp of the ChassisPowerOnStarted PEL
+ *
+ * Loop through all the D-Bus error objects to find PEL matching
+ * ChassisPowerOnStarted and return the timestamp of it.
+ *
+ * For faultlog consider only those pels that are logged after chassis
+ * has powered-on i.e after xyz.openbmc_project.State.Info.ChassisPowerOnStarted
+ * PEL has been created. If poweron PEL is not found consider
+ * all errors. This is done to remove duplicate PELS that are
+ * logged during IPL for a long running system. Considering only latest
+ * errors.
+ *
+ * For some of the PELS user might not have changed the resolved bit
+ * to true after replacing a failed FRU, it too will show up in the
+ * faultlog dump so considering only those that are logged after poweron.
+ *
+ * @param[in] objects - error log D-Bus objects
+ *
+ * @return timestamp of the pel if found else return 0
+ */
+static uint64_t getChassisPoweronErrTimestamp(const Objects& objects)
+{
+    // xyz.openbmc_project.State.Info.ChassisPowerOnStarted pel
+    const std::string chassisPwnOnStartedErrSrc = "BD8D3416";
+    uint64_t timestamp = 0;
+    std::string refCode;
+    for (const auto& [path, interfaces] : objects)
+    {
+        for (const auto& [intf, properties] : interfaces)
+        {
+            if (intf == "xyz.openbmc_project.Logging.Entry")
+            {
+                for (const auto& [prop, propValue] : properties)
+                {
+                    if (prop == "EventId")
+                    {
+                        auto eventIdPtr = std::get_if<std::string>(&propValue);
+                        if (eventIdPtr != nullptr)
+                        {
+                            // EventId B700900B 00000072 00010016 ...
+                            // First value is RefCode
+                            std::istringstream iss(*eventIdPtr);
+                            iss >> refCode;
+                        }
+                    }
+                }
+            }
+            else if (intf == "org.open_power.Logging.PEL.Entry")
+            {
+                for (const auto& [prop, propValue] : properties)
+                {
+                    if (prop == "Timestamp")
+                    {
+                        auto timestampPtr = std::get_if<uint64_t>(&propValue);
+                        if (timestampPtr != nullptr)
+                        {
+                            timestamp = *timestampPtr;
+                        }
+                    }
+                }
+            }
+        }
+
+        // if chassis poweron src is found return the timestamp
+        // of that pel or error object
+        if (refCode == chassisPwnOnStartedErrSrc)
+        {
+            return timestamp;
+        }
+    }
+    return 0;
+}
+
 int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
 {
     int count = 0;
@@ -77,6 +152,10 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
             "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
         auto reply = bus.call(method);
         reply.read(objects);
+
+        // read timestamp of poweron PEL
+        uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+
         for (const auto& [path, interfaces] : objects)
         {
             bool resolved = true;
@@ -85,6 +164,7 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
             bool deconfigured = false;
             bool guarded = false;
             std::string refCode;
+            uint64_t timestamp = 0;
             for (const auto& [intf, properties] : interfaces)
             {
                 if (intf == "xyz.openbmc_project.Logging.Entry")
@@ -142,9 +222,19 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
                                 guarded = *guardPtr;
                             }
                         }
+                        else if (prop == "Timestamp")
+                        {
+                            auto timestampPtr =
+                                std::get_if<uint64_t>(&propValue);
+                            if (timestampPtr != nullptr)
+                            {
+                                timestamp = *timestampPtr;
+                            }
+                        }
                     }
                 }
             }
+
             if (resolved == true)
             {
                 continue;
@@ -174,6 +264,11 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
             }
 
             if (guarded == true) // will be captured as part of guard records
+            {
+                continue;
+            }
+            // Ignore PELS that are created before chassis poweron
+            if (timestamp < poweronTimestamp)
             {
                 continue;
             }
@@ -208,6 +303,9 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
             "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
         auto reply = bus.call(method);
         reply.read(objects);
+
+        uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+
         for (const auto& [path, interfaces] : objects)
         {
             bool resolved = true;
@@ -305,6 +403,7 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                     }
                 }
             }
+
             if (resolved == true)
             {
                 continue;
@@ -339,6 +438,15 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
             if (guarded == true)
             {
                 continue; // will be captured as part of guard records
+            }
+
+            // Ignore PELS that are created before chassis poweron
+            if (timestamp < poweronTimestamp)
+            {
+                lg2::info("Ignoring PEL created before chassis "
+                          "poweron {OBJECT}",
+                          "OBJECT", path.str);
+                continue;
             }
 
             // add cec errorlog
