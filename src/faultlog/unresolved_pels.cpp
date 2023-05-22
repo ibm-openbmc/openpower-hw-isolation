@@ -27,7 +27,7 @@ using Objects = std::map<sdbusplus::message::object_path, Interfaces>;
 
 constexpr auto stateConfigured = "CONFIGURED";
 constexpr auto stateDeconfigured = "DECONFIGURED";
-
+constexpr std::string pwrThermalErrPrefix = "1100";
 struct GuardedTarget
 {
     pdbg_target* target = nullptr;
@@ -66,7 +66,7 @@ static int getGuardedTarget(struct pdbg_target* target, void* priv)
     return 0;
 }
 
-int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
+int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
 {
     int count = 0;
     try
@@ -84,6 +84,7 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
                 "xyz.openbmc_project.Logging.Entry.Level.Informational";
             bool deconfigured = false;
             bool guarded = false;
+            std::string refCode;
             for (const auto& [intf, properties] : interfaces)
             {
                 if (intf == "xyz.openbmc_project.Logging.Entry")
@@ -105,6 +106,18 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
                             if (severityPtr != nullptr)
                             {
                                 severity = *severityPtr;
+                            }
+                        }
+                        else if (prop == "EventId")
+                        {
+                            auto eventIdPtr =
+                                std::get_if<std::string>(&propValue);
+                            if (eventIdPtr != nullptr)
+                            {
+                                // EventId B700900B 00000072 00010016 ...
+                                // First value is RefCode
+                                std::istringstream iss(*eventIdPtr);
+                                iss >> refCode;
                             }
                         }
                     }
@@ -137,7 +150,16 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
                 continue;
             }
 
-            // ign re informational and debug errors
+            if (hostPowerOn) // invoked as part of start host service
+            {
+                // power and thermal err src starts with 1100
+                if (refCode.substr(0, pwrThermalErrPrefix.length()) ==
+                    pwrThermalErrPrefix)
+                {
+                    continue;
+                }
+            }
+            // ignore informational and debug errors
             if ((severity == "xyz.openbmc_project.Logging.Entry.Level.Debug") ||
                 (severity ==
                  "xyz.openbmc_project.Logging.Entry.Level.Informational") ||
@@ -156,7 +178,7 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
                 continue;
             }
             count += 1;
-        }
+        } // endfor
     }
     catch (
         const sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument&
@@ -175,7 +197,8 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus)
 }
 
 void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
-                              const GuardRecords& guardRecords, json& jsonNag)
+                              const GuardRecords& guardRecords,
+                              bool hostPowerOn, json& jsonNag)
 {
     try
     {
@@ -234,6 +257,8 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                                 std::get_if<std::string>(&propValue);
                             if (eventIdPtr != nullptr)
                             {
+                                // EventId B700900B 00000072 ...
+                                // First value is RefCode
                                 std::istringstream iss(*eventIdPtr);
                                 iss >> refCode;
                             }
@@ -285,10 +310,22 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                 continue;
             }
 
+            if (hostPowerOn)
+            {
+                // power and thermal err src starts with 1100
+                if (refCode.substr(0, pwrThermalErrPrefix.length()) ==
+                    pwrThermalErrPrefix)
+                {
+                    lg2::info("Ignoring power, thermal errors during IPL "
+                              "{OBJECT}",
+                              "OBJECT", path.str);
+                    continue;
+                }
+            }
             // ignore informational and debug errors
             if ((severity == "xyz.openbmc_project.Logging.Entry.Level.Debug") ||
-                (severity ==
-                 "xyz.openbmc_project.Logging.Entry.Level.Informational") ||
+                (severity == "xyz.openbmc_project.Logging.Entry.Level."
+                             "Informational") ||
                 (severity == "xyz.openbmc_project.Logging.Entry.Level.Notice"))
             {
                 continue;
@@ -330,7 +367,8 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                                          &guardedTarget);
                     if (guardedTarget.target == nullptr)
                     {
-                        lg2::info("Failed to find the pdbg target for guarded "
+                        lg2::info("Failed to find the pdbg target for "
+                                  "guarded "
                                   "target {RECORD_ID}",
                                   "RECORD_ID", elem.recordId);
                         continue;
@@ -384,9 +422,9 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
     }
     catch (const std::exception& ex)
     {
-        lg2::error(
-            "Failed to add unresolved pels with deconfig bit set {ERROR}",
-            "ERROR", ex.what());
+        lg2::error("Failed to add unresolved pels with deconfig bit "
+                   "set {ERROR}",
+                   "ERROR", ex.what());
     }
 }
 } // namespace openpower::faultlog

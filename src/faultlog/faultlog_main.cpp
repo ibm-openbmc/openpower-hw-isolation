@@ -31,13 +31,14 @@ using PropVariant = sdbusplus::utility::dedup_variant_t<Binary>;
  *
  *  @param[in] bus - D-Bus to attach to
  *  @param[in] guardRecords - hardware isolated records to parse
+ *  @param[in] hostPowerOn - flag to check if called during host IPL
  */
 void createNagPel(sdbusplus::bus::bus& bus,
-                  const GuardRecords& unresolvedRecords)
+                  const GuardRecords& unresolvedRecords, bool hostPowerOn)
 {
     int guardCount = GuardWithEidRecords::getCount(unresolvedRecords);
     int manualGuardCount = GuardWithoutEidRecords::getCount(unresolvedRecords);
-    int unresolvedPelsCount = UnresolvedPELs::getCount(bus);
+    int unresolvedPelsCount = UnresolvedPELs::getCount(bus, hostPowerOn);
     int deconfigCount = DeconfigRecords::getCount();
 
     if ((guardCount > 0) || (manualGuardCount > 0) ||
@@ -78,10 +79,11 @@ void createNagPel(sdbusplus::bus::bus& bus,
  *
  *  @param[in] bus - D-Bus to attach to
  *  @param[in] unresolvedRecords - hardware isolated records to parse
+ *  @param[in] hostPowerOn - flag to check if called during host IPL
  *  @param[in] msg - property change D-Bus message
  */
 void propertyChanged(sdbusplus::bus::bus& bus,
-                     const GuardRecords& unresolvedRecords,
+                     const GuardRecords& unresolvedRecords, bool hostPowerOn,
                      const sdbusplus::message::message& msg)
 {
     using ProgressStages = sdbusplus::xyz::openbmc_project::State::Boot::
@@ -111,7 +113,7 @@ void propertyChanged(sdbusplus::bus::bus& bus,
                 {
                     lg2::info("faultlog - host poweron host reached "
                               "apply guard state creating nag pel");
-                    createNagPel(bus, unresolvedRecords);
+                    createNagPel(bus, unresolvedRecords, hostPowerOn);
                     exit(EXIT_SUCCESS);
                 }
             }
@@ -241,7 +243,7 @@ int main(int argc, char** argv)
         // unresolved pels with deconfig bit set
         else if (unresolvedPels)
         {
-            (void)UnresolvedPELs::populate(bus, unresolvedRecords,
+            (void)UnresolvedPELs::populate(bus, unresolvedRecords, hostPowerOn,
                                            faultLogJson);
         }
 
@@ -254,7 +256,7 @@ int main(int argc, char** argv)
         // create fault log pel if there are service actions pending
         else if (createPel)
         {
-            createNagPel(bus, unresolvedRecords);
+            createNagPel(bus, unresolvedRecords, hostPowerOn);
         }
         // create bmc reboot pel
         else if (bmcReboot)
@@ -273,14 +275,14 @@ int main(int argc, char** argv)
             }
             else
             {
-                createNagPel(bus, unresolvedRecords);
+                createNagPel(bus, unresolvedRecords, hostPowerOn);
             }
         }
         else if (hostPowerOn)
         {
             if (isHostProgressStateRunning(bus))
             {
-                createNagPel(bus, unresolvedRecords);
+                createNagPel(bus, unresolvedRecords, hostPowerOn);
             }
             else
             {
@@ -293,8 +295,9 @@ int main(int argc, char** argv)
                             "/xyz/openbmc_project/state/host0",
                             "xyz.openbmc_project.State.Boot."
                             "Progress"),
-                        [&bus, &unresolvedRecords](auto& msg) {
-                            propertyChanged(bus, unresolvedRecords, msg);
+                        [&bus, &unresolvedRecords, hostPowerOn](auto& msg) {
+                            propertyChanged(bus, unresolvedRecords, hostPowerOn,
+                                            msg);
                         });
                 bus.process_loop();
             }
@@ -309,7 +312,7 @@ int main(int argc, char** argv)
 
             (void)FaultLogPolicy::populate(bus, faultLogJson);
 
-            (void)UnresolvedPELs::populate(bus, unresolvedRecords,
+            (void)UnresolvedPELs::populate(bus, unresolvedRecords, hostPowerOn,
                                            faultLogJson);
             (void)DeconfigRecords::populate(faultLogJson);
         }
