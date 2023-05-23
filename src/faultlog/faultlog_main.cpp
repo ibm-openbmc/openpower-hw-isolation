@@ -56,7 +56,7 @@ void createNagPel(sdbusplus::bus::bus& bus,
             "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
             "xyz.openbmc_project.Logging.Create", "Create");
         method.append("org.open_power.Faultlog.Error.DeconfiguredHW",
-                      Severity::Error, data);
+                      Severity::Warning, data);
         auto reply = method.call();
         if (reply.is_method_error())
         {
