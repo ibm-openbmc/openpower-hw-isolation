@@ -27,6 +27,11 @@ struct GuardedTarget
     {}
 };
 using ::sdbusplus::xyz::openbmc_project::Common::Error::InvalidArgument;
+using PropertyValue =
+    std::variant<std::string, bool, uint8_t, int16_t, uint16_t, int32_t,
+                 uint32_t, int64_t, uint64_t, double>;
+
+using Properties = std::map<std::string, PropertyValue>;
 /**
  * @brief Get PDBG target matching the guarded target physicalpath
  *
@@ -83,33 +88,90 @@ void GuardWithEidRecords::populate(sdbusplus::bus::bus& bus,
             {
                 continue;
             }
-
-            // add ERROR_LOG secion
             uint32_t bmcLogId;
-            auto method1 = bus.new_method_call(
+            auto method = bus.new_method_call(
                 "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
                 "org.open_power.Logging.PEL", "GetBMCLogIdFromPELId");
 
-            method1.append(static_cast<uint32_t>(elem.elogId));
-            auto resp1 = bus.call(method1);
-            resp1.read(bmcLogId);
+            method.append(static_cast<uint32_t>(elem.elogId));
+            auto resp = bus.call(method);
+            resp.read(bmcLogId);
+
             json jsonErrorLog = json::object();
-            std::string pel;
+            uint32_t plid = 0;
+            uint64_t timestamp = 0;
+            std::string callouts;
+            std::string refCode;
 
-            auto method2 = bus.new_method_call(
-                "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
-                "org.open_power.Logging.PEL", "GetPELJSON");
-            method2.append(bmcLogId);
-            auto resp2 = bus.call(method2);
-            resp2.read(pel);
-            json pelJson = std::move(json::parse(pel));
+            std::string objPath = "/xyz/openbmc_project/logging/entry/" +
+                                  std::to_string(bmcLogId);
 
-            jsonErrorLog["ERR_PLID"] =
-                pelJson["Private Header"]["Platform Log Id"];
-            jsonErrorLog["Callout Section"] =
-                pelJson["Primary SRC"]["Callout Section"];
-            jsonErrorLog["SRC"] = pelJson["Primary SRC"]["Reference Code"];
-            jsonErrorLog["DATE_TIME"] = pelJson["Private Header"]["Created at"];
+            // xyz.openbmc_project.Logging.Entry
+            {
+                Properties properties;
+                auto method = bus.new_method_call(
+                    "xyz.openbmc_project.Logging", objPath.c_str(),
+                    "org.freedesktop.DBus.Properties", "GetAll");
+                method.append("xyz.openbmc_project.Logging.Entry");
+                auto reply = bus.call(method);
+                reply.read(properties);
+                for (const auto& [prop, propValue] : properties)
+                {
+                    if (prop == "Resolution")
+                    {
+                        auto calloutsPtr = std::get_if<std::string>(&propValue);
+                        if (calloutsPtr != nullptr)
+                        {
+                            callouts = *calloutsPtr;
+                        }
+                    }
+                    else if (prop == "EventId")
+                    {
+                        auto eventIdPtr = std::get_if<std::string>(&propValue);
+                        if (eventIdPtr != nullptr)
+                        {
+                            std::istringstream iss(*eventIdPtr);
+                            iss >> refCode;
+                        }
+                    }
+                }
+            }
+            // org.open_power.Logging.PEL.Entry
+            {
+                Properties properties;
+                auto method = bus.new_method_call(
+                    "xyz.openbmc_project.Logging", objPath.c_str(),
+                    "org.freedesktop.DBus.Properties", "GetAll");
+                method.append("org.open_power.Logging.PEL.Entry");
+                auto reply = bus.call(method);
+                reply.read(properties);
+                for (const auto& [prop, propValue] : properties)
+                {
+                    if (prop == "PlatformLogID")
+                    {
+                        auto plidPtr = std::get_if<uint32_t>(&propValue);
+                        if (plidPtr != nullptr)
+                        {
+                            plid = *plidPtr;
+                        }
+                    }
+                    else if (prop == "Timestamp")
+                    {
+                        auto timestampPtr = std::get_if<uint64_t>(&propValue);
+                        if (timestampPtr != nullptr)
+                        {
+                            timestamp = *timestampPtr;
+                        }
+                    }
+                }
+            }
+            std::stringstream ss;
+            ss << std::hex << "0x" << plid;
+            jsonErrorLog["ERR_PLID"] = ss.str();
+            jsonErrorLog["Callout Section"] = parseCallout(callouts);
+            refCode.insert(0, "0x");
+            jsonErrorLog["SRC"] = refCode;
+            jsonErrorLog["DATE_TIME"] = epochTimeToBCD(timestamp);
 
             json jsonErrorLogSection = json::array();
             jsonErrorLogSection.push_back(std::move(jsonErrorLog));

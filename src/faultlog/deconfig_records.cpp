@@ -26,7 +26,7 @@ struct DeconfigDataList
 };
 
 /**
- * @brief Get pedgt targets which has been deconfigured
+ * @brief Get pdbg targets which has been deconfigured
  *
  * This callback function is called as part of the recursive method
  * pdbg_target_traverse, recursion will exit when the method return 1

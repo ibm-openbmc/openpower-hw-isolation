@@ -73,7 +73,7 @@ static int guardedTargets(struct pdbg_target* target, void* priv)
     return 0;
 }
 
-int GuardWithoutEidRecords::getCount(GuardRecords& guardRecords)
+int GuardWithoutEidRecords::getCount(const GuardRecords& guardRecords)
 {
     int count = 0;
     for (const auto& elem : guardRecords)

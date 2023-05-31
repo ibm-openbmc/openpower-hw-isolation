@@ -1,13 +1,18 @@
 #pragma once
 
 #include <libguard/include/guard_record.hpp>
+#include <nlohmann/json.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/bus.hpp>
-using ::openpower::guard::GuardRecords;
+#include <xyz/openbmc_project/State/Boot/Progress/server.hpp>
+#include <xyz/openbmc_project/State/Host/server.hpp>
+
+#include <ctime>
 
 namespace openpower::faultlog
 {
-
+using ::nlohmann::json;
+using ::openpower::guard::GuardRecords;
 /**
  * @brief Read property value from the specified object and interface
  * @param[in] bus D-Bus handle
@@ -53,5 +58,38 @@ T readProperty(sdbusplus::bus::bus& bus, const std::string& service,
  */
 std::string getGuardReason(const GuardRecords& guardRecords,
                            const std::string& path);
+
+/**
+ * @brief Return true if host completed IPL and reached runtime
+ * @param[in] bus - D-Bus handle
+ *
+ * @return true if in runtime else false
+ */
+bool isHostProgressStateRunning(sdbusplus::bus::bus& bus);
+
+/**
+ * @brief Return true if host started running
+ * @param[in] bus - D-Bus handle
+ *
+ * @return true if host started
+ */
+bool isHostStateRunning(sdbusplus::bus::bus& bus);
+
+/**
+ * @brief Return time in BCD from milliSeconds since epoch time
+ * @param[in] milliSeconds - milli seconds since epoch time
+ *
+ * @return string time value in string format
+ */
+std::string epochTimeToBCD(uint64_t milliSeconds);
+
+/**
+ * @brief Parse the callout values from the logging Resolution property
+ *
+ * @param[in] callout - callouts string
+ *
+ * @return Json object as per NAG specification for callouts
+ */
+json parseCallout(const std::string callout);
 
 } // namespace openpower::faultlog

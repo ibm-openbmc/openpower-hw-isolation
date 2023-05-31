@@ -10,12 +10,11 @@ After=mapper-wait@-xyz-openbmc_project-logging.service
 Wants=com.ibm.VPD.Manager.service
 After=com.ibm.VPD.Manager.service
 
-Wants=obmc-power-on@%0.target
-After=obmc-power-on@%0.target
-Conflicts=obmc-power-off@%0.target
+Conflicts=obmc-power-off@0.target
+Conflicts=obmc-host-stop@0.target
 
 [Service]
-ExecStart=@bindir@/faultlog -c
+ExecStart=@bindir@/faultlog -r
 Type=oneshot
 SyslogIdentifier=faultlog
 

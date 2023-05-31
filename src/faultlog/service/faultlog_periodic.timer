@@ -2,8 +2,8 @@
 Description=Periodic faultlog timer to run once every month
 
 [Timer]
-OnBootSec=5min
-OnUnitActiveSec=1mon
+OnBootSec=30d
+OnUnitActiveSec=30d
 Unit=faultlog_bmcboot.service
 
 [Install]
