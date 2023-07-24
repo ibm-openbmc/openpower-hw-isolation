@@ -176,13 +176,71 @@ int main(int argc, char** argv)
         CLI::App app{"Faultlog tool"};
         app.set_help_flag("-h, --help", "Faultlog tool options");
 
-        initPHAL();
-        openpower::guard::libguard_init(false);
-
         auto bus = sdbusplus::bus::new_default();
 
         nlohmann::json faultLogJson = json::array();
 
+        bool guardWithEid = false;
+        bool guardWithoutEid = false;
+        bool policy = false;
+        bool unresolvedPels = false;
+        bool deconfig = false;
+        bool createPel = false;
+        bool listFaultlog = false;
+        bool periodic = false;
+        bool hostPowerOn = false;
+
+        app.set_help_flag("-h, --help", "Faultlog tool options");
+        app.add_flag("-g, --guardwterr", guardWithEid,
+                     "Populate guard records with associated error objects "
+                     "details to JSON");
+        app.add_flag("-m, --guardmanual", guardWithoutEid,
+                     "Populate guard records without associated error objects "
+                     "details to JSON");
+        app.add_flag("-l, --policy", policy,
+                     "Populate faultlog policy and FCO values to JSON");
+        app.add_flag("-u, --unresolvedPels", unresolvedPels,
+                     "Populate unresolved pels with deconfig bit set "
+                     "details to JSON");
+        app.add_flag("-d, --deconfig", deconfig,
+                     "Populate deconfigured target details to JSON");
+        app.add_flag("-c, --createPel", createPel,
+                     "Create faultlog pel if there are guarded/deconfigured "
+                     "records present");
+        app.add_flag("-r, --reboot", periodic,
+                     "Create faultlog pel periodically if there are "
+                     "guarded/deconfigured "
+                     "records present");
+        app.add_flag("-p, --hostpoweron", hostPowerOn,
+                     "Create faultlog pel during host power-on if there are "
+                     "guarded/deconfigured "
+                     "records present");
+        app.add_flag("-f, --faultlog", listFaultlog,
+                     "List all fault log records in JSON format");
+
+        CLI11_PARSE(app, argc, argv);
+
+        // exit periodic service if host is not at running state gracefully
+        if (periodic)
+        {
+            // interested only in bmc reboot, host should have been in
+            // IPL runtime during bmc reboot
+            if (!isHostStateRunning(bus)) // host started
+            {
+                lg2::info("Ignore, host is not started so not bmc reboot");
+                exit(EXIT_SUCCESS);
+            }
+
+            else if (!isHostProgressStateRunning(bus)) // host in ipl runtime
+            {
+                lg2::info("Ignore, host is not in running state not "
+                          "bmc reboot");
+                exit(EXIT_SUCCESS);
+            }
+        }
+
+        initPHAL();
+        openpower::guard::libguard_init(false);
         std::string propVal{};
         try
         {
@@ -221,46 +279,6 @@ int main(int argc, char** argv)
                 unresolvedRecords.emplace_back(elem);
             }
         }
-
-        bool guardWithEid = false;
-        bool guardWithoutEid = false;
-        bool policy = false;
-        bool unresolvedPels = false;
-        bool deconfig = false;
-        bool createPel = false;
-        bool listFaultlog = false;
-        bool bmcReboot = false;
-        bool hostPowerOn = false;
-
-        app.set_help_flag("-h, --help", "Faultlog tool options");
-        app.add_flag("-g, --guardwterr", guardWithEid,
-                     "Populate guard records with associated error objects "
-                     "details to JSON");
-        app.add_flag("-m, --guardmanual", guardWithoutEid,
-                     "Populate guard records without associated error objects "
-                     "details to JSON");
-        app.add_flag("-l, --policy", policy,
-                     "Populate faultlog policy and FCO values to JSON");
-        app.add_flag("-u, --unresolvedPels", unresolvedPels,
-                     "Populate unresolved pels with deconfig bit set "
-                     "details to JSON");
-        app.add_flag("-d, --deconfig", deconfig,
-                     "Populate deconfigured target details to JSON");
-        app.add_flag("-c, --createPel", createPel,
-                     "Create faultlog pel if there are guarded/deconfigured "
-                     "records present");
-        app.add_flag("-r, --reboot", bmcReboot,
-                     "Create faultlog pel during reboot if there are "
-                     "guarded/deconfigured "
-                     "records present");
-        app.add_flag("-p, --hostpoweron", hostPowerOn,
-                     "Create faultlog pel during host power-on if there are "
-                     "guarded/deconfigured "
-                     "records present");
-        app.add_flag("-f, --faultlog", listFaultlog,
-                     "List all fault log records in JSON format");
-
-        CLI11_PARSE(app, argc, argv);
 
         // guard records with associated error object
         if (guardWithEid)
@@ -301,24 +319,9 @@ int main(int argc, char** argv)
             createNagPel(bus, unresolvedRecords, hostPowerOn);
         }
         // create bmc reboot pel
-        else if (bmcReboot)
+        else if (periodic)
         {
-            // interested only in bmc reboot, host should have been in
-            // IPL runtime during bmc reboot
-            if (!isHostStateRunning(bus)) // host started
-            {
-                lg2::info("Ignore, host is not started so not bmc reboot");
-            }
-
-            else if (!isHostProgressStateRunning(bus)) // host in ipl runtime
-            {
-                lg2::info("Ignore, host is not in running state not "
-                          "bmc reboot");
-            }
-            else
-            {
-                createNagPel(bus, unresolvedRecords, hostPowerOn);
-            }
+            createNagPel(bus, unresolvedRecords, hostPowerOn);
         }
         else if (hostPowerOn)
         {
@@ -376,6 +379,7 @@ int main(int argc, char** argv)
         lg2::error("Failed {ERROR}", "ERROR", e.what());
         exit(EXIT_FAILURE);
     }
+    lg2::info("exit faultlog app to collect deconfig/guard records details");
     // wait for a while for the D-Bus method to complete-
     sleep(2);
     return 0;
