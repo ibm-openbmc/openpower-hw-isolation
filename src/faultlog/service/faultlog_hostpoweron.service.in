@@ -1,7 +1,5 @@
 [Unit]
-Description=Faultlog application
-Wants=xyz.openbmc_project.Dump.Manager.service
-After=xyz.openbmc_project.Dump.Manager.service
+Description=Faultlog application(host poweron)
 Wants=mapper-wait@-xyz-openbmc_project-inventory.service
 After=mapper-wait@-xyz-openbmc_project-inventory.service
 Wants=org.open_power.HardwareIsolation.service
@@ -10,6 +8,11 @@ Wants=mapper-wait@-xyz-openbmc_project-logging.service
 After=mapper-wait@-xyz-openbmc_project-logging.service
 Wants=com.ibm.VPD.Manager.service
 After=com.ibm.VPD.Manager.service
+Wants=After=xyz.openbmc_project.State.Host@0.service
+After=After=xyz.openbmc_project.State.Host@0.service
+Wants=xyz.openbmc_project.State.Chassis@0.service
+After=xyz.openbmc_project.State.Chassis@0.service
+#ConditionPathExists=/run/openbmc/host@%i-on
 
 Wants=obmc-host-started@0.target
 After=obmc-host-started@0.target
