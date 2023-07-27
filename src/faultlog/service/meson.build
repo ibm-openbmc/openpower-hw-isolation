@@ -3,11 +3,9 @@ systemd_system_unit_dir = systemd_dep.get_variable(
 conf_data = configuration_data()
 conf_data.set('bindir', get_option('prefix') / get_option('bindir'))
 
-input_files = ['faultlog_periodic.service.in', 'faultlog_hostpoweron.service.in',
-        'faultlog_periodic.timer']
+input_files = ['faultlog_hostpoweron.service.in', 'faultlog_periodic.timer']
 
-output_files = ['faultlog_periodic.service', 'faultlog_hostpoweron.service',
-        'faultlog_periodic.timer']
+output_files = ['faultlog_hostpoweron.service', 'faultlog_periodic.timer']
 
 counter = 0
 foreach i : input_files
@@ -24,10 +22,6 @@ foreach i : input_files
   counter += 1
 endforeach
     
-systemd_alias = [[
-    '../faultlog_periodic.service', 'multi-user.target.wants/faultlog_periodic.service'
-]]
-
 systemd_alias += [[
     '../faultlog_hostpoweron.service', 'obmc-host-startmin@0.target.wants/faultlog_hostpoweron.service'
 ]]

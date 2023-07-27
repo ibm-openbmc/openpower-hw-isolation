@@ -5,6 +5,7 @@
 #include <CLI/CLI.hpp>
 #include <deconfig_records.hpp>
 #include <faultlog_policy.hpp>
+#include <function2/function2.hpp>
 #include <guard_with_eid_records.hpp>
 #include <guard_without_eid_records.hpp>
 #include <libguard/guard_interface.hpp>
@@ -12,6 +13,9 @@
 #include <nlohmann/json.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <sdbusplus/bus.hpp>
+#include <sdeventplus/clock.hpp>
+#include <sdeventplus/source/event.hpp>
+#include <sdeventplus/utility/timer.hpp>
 #include <unresolved_pels.hpp>
 #include <util.hpp>
 
@@ -29,10 +33,12 @@ using ::openpower::guard::GuardRecords;
 #define GUARD_RESOLVED 0xFFFFFFFF
 
 using Severity = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
+using Timer = sdeventplus::utility::Timer<sdeventplus::ClockId::Monotonic>;
 
 using Binary = std::vector<uint8_t>;
 using PropVariant = sdbusplus::utility::dedup_variant_t<Binary>;
 
+constexpr std::chrono::milliseconds hostStateCheckTimeout(50); // 50 milli sec
 /**
  * @brief To init phal library for use power system specific device tree
  *
@@ -180,6 +186,7 @@ int main(int argc, char** argv)
         openpower::guard::libguard_init(false);
 
         auto bus = sdbusplus::bus::new_default();
+        auto event = sdeventplus::Event::get_default();
 
         nlohmann::json faultLogJson = json::array();
 
@@ -341,6 +348,27 @@ int main(int argc, char** argv)
                             propertyChanged(bus, unresolvedRecords, hostPowerOn,
                                             msg);
                         });
+
+                // with host at runtime and at bmc reboot, state manager during
+                // reboot does not notify propertyChanged signal as host is
+                // already at runtime rather state manager simply sets the D-Bus
+                // property. using timer to check for progress state change
+                auto timerCb = [&bus, &unresolvedRecords,
+                                hostPowerOn](Timer& timer) {
+                    if (isHostProgressStateRunning(bus))
+                    {
+                        lg2::info("faultlog poweron timer - host is in running "
+                                  "state ");
+                        createNagPel(bus, unresolvedRecords, hostPowerOn);
+                        timer.setEnabled(false);
+                        exit(EXIT_SUCCESS);
+                    }
+                    lg2::info("faultlog poweron timer - host is in not yet in "
+                              "running state ");
+                };
+                Timer timer(event, std::move(timerCb));
+                timer.setInterval(hostStateCheckTimeout);
+                timer.setEnabled(true);
                 bus.process_loop();
             }
         }

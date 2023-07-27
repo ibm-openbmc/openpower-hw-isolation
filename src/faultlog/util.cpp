@@ -3,8 +3,8 @@
 #include <util.hpp>
 
 #include <iomanip>
+#include <iostream>
 #include <sstream>
-
 namespace openpower::faultlog
 {
 
@@ -47,6 +47,10 @@ ProgressStages getBootProgress(sdbusplus::bus::bus& bus)
         const ProgressStages* progPtr = std::get_if<ProgressStages>(&retVal);
         if (progPtr != nullptr)
         {
+            std::string bootProgress = sdbusplus::xyz::openbmc_project::State::
+                Boot::server::Progress::convertProgressStagesToString(*progPtr);
+            std::cout << "DEVENDER getBootProgress " << bootProgress
+                      << std::endl;
             return *progPtr;
         }
     }
@@ -74,6 +78,9 @@ HostState getHostState(sdbusplus::bus::bus& bus)
         const HostState* statePtr = std::get_if<HostState>(&retVal);
         if (statePtr != nullptr)
         {
+            std::string hostState = sdbusplus::xyz::openbmc_project::State::
+                server::Host::convertHostStateToString(*statePtr);
+            std::cout << "DEVENDER getHostState " << hostState << std::endl;
             return *statePtr;
         }
     }
@@ -95,8 +102,10 @@ bool isHostProgressStateRunning(sdbusplus::bus::bus& bus)
         (progress == ProgressStages::OSStart) ||
         (progress == ProgressStages::OSRunning))
     {
+        std::cout << "DEVENDER isHostProgressStateRunning true" << std::endl;
         return true;
     }
+    std::cout << "DEVENDER isHostProgressStateRunning false " << std::endl;
     return false;
 }
 

@@ -31,6 +31,7 @@ libdtapi = dependency('libdt-api')
 libguard = cpp.find_library('libguard')
 
 systemd_dep = dependency('systemd')
+sdeventplus = dependency('sdeventplus')
 
 faultlog_sources = [ 
         'faultlog_main.cpp',
@@ -51,7 +52,8 @@ faultlog_dependencies = [
         nlohmann_json,
         libpdbg,
         libdtapi,
-        libguard
+        libguard,
+        sdeventplus
     ]
 
 executable('faultlog',

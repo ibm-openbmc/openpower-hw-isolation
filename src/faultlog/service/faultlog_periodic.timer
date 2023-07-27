@@ -2,9 +2,9 @@
 Description=Periodic faultlog timer to run once every month
 
 [Timer]
-OnBootSec=30d
-OnUnitActiveSec=30d
-Unit=faultlog_periodic.service
+OnBootSec=10min
+OnUnitActiveSec=10min
+Unit=faultlog_hostpoweron.service
 
 [Install]
 WantedBy=timers.target
