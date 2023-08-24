@@ -37,6 +37,8 @@ using Severity = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 using Binary = std::vector<uint8_t>;
 
 constexpr std::chrono::milliseconds hostStateCheckTimeout(5000); // 5sec
+constexpr auto IGNORE_PWR_FAN_PEL = true;
+
 /**
  * @brief To init phal library for use power system specific device tree
  *
@@ -71,15 +73,15 @@ void initPHAL()
  *
  *  @param[in] bus - D-Bus to attach to
  *  @param[in] guardRecords - hardware isolated records to parse
- *  @param[in] hostPowerOn - flag to check if called during host IPL
+ *  @param[in] ignorePwrFanPel - flag to check if called during host IPL
  */
 void createNagPel(sdbusplus::bus::bus& bus,
-                  const GuardRecords& unresolvedRecords, bool hostPowerOn)
+                  const GuardRecords& unresolvedRecords, bool ignorePwrFanPel)
 {
     //
     // serviceable records count
     int guardCount = GuardWithEidRecords::getCount(unresolvedRecords);
-    int unresolvedPelsCount = UnresolvedPELs::getCount(bus, hostPowerOn);
+    int unresolvedPelsCount = UnresolvedPELs::getCount(bus, ignorePwrFanPel);
 
     //
     // deconfigured records count
@@ -141,28 +143,19 @@ GuardRecords getGuardRecords()
     return unresolvedRecords;
 }
 
-/** @brief Create faultlog pel for host poweron
- *
- *  As the application waits for host to reach running state,
- *  re-read the guard records as they might be changed during IPL
- *
- *  @param[in] bus - D-Bus to attach to
- */
-void createHostPowerOnNagPel(sdbusplus::bus::bus& bus)
-{
-    GuardRecords unresolvedRecords = getGuardRecords();
-    createNagPel(bus, unresolvedRecords, true);
-}
-
 /** @brief Callback method for boot progress property change
  *
  *  @param[in] bus - D-Bus to attach to
  *  @param[in] unresolvedRecords - hardware isolated records to parse
- *  @param[in] hostPowerOn - flag to check if called during host IPL
  *  @param[in] msg - property change D-Bus message
  */
-void propertyChanged(sdbusplus::bus::bus& bus, sdbusplus::message::message& msg)
+void propertyChanged(sdbusplus::bus::bus& bus, sdbusplus::message::message& msg,
+                     Timer& timer)
 {
+    // cancel the timer as we are getting property change requests
+    // timer was added only to cater for bmc reboot when host is already
+    // at running state and no property changed request will be coming
+    timer.setEnabled(false);
     using ProgressStages = sdbusplus::xyz::openbmc_project::State::Boot::
         server::Progress::ProgressStages;
     using PropertiesVariant =
@@ -190,7 +183,9 @@ void propertyChanged(sdbusplus::bus::bus& bus, sdbusplus::message::message& msg)
                 {
                     lg2::info("faultlog - host poweron host reached "
                               "apply guard state creating nag pel");
-                    createHostPowerOnNagPel(bus);
+                    GuardRecords unresolvedRecords = getGuardRecords();
+                    // ipl/poweron ignore fan/power err
+                    createNagPel(bus, unresolvedRecords, IGNORE_PWR_FAN_PEL);
                     exit(EXIT_SUCCESS);
                 }
             }
@@ -299,7 +294,7 @@ int main(int argc, char** argv)
         // host will be already on, create nagpel
         if (bmcReboot)
         {
-            createNagPel(bus, unresolvedRecords, hostPowerOn);
+            createNagPel(bus, unresolvedRecords, !IGNORE_PWR_FAN_PEL);
         }
         // guard records with associated error object
         else if (guardWithEid)
@@ -324,7 +319,7 @@ int main(int argc, char** argv)
         // unresolved pels with deconfig bit set
         else if (unresolvedPels)
         {
-            (void)UnresolvedPELs::populate(bus, unresolvedRecords, hostPowerOn,
+            (void)UnresolvedPELs::populate(bus, unresolvedRecords,
                                            faultLogJson);
         }
 
@@ -337,32 +332,21 @@ int main(int argc, char** argv)
         // create fault log pel if there are service actions pending
         else if (createPel)
         {
-            createNagPel(bus, unresolvedRecords, hostPowerOn);
+            createNagPel(bus, unresolvedRecords, !IGNORE_PWR_FAN_PEL);
         }
+        // host poweron service is called both for bmc reboot and host poweron
+        // need to decide bmc reboot based on host boot progress state
         else if (hostPowerOn)
         {
             if (isHostProgressStateRunning(bus))
             {
                 lg2::info("faultlog hostpoweron host is already in running "
-                          "state, create fautlog pel ");
-                createNagPel(bus, unresolvedRecords, hostPowerOn);
+                          "state consider it as bmc reboot ");
+                createNagPel(bus, unresolvedRecords,
+                             !IGNORE_PWR_FAN_PEL); // add as it is bmcreboot
             }
             else
             {
-                // wait for host to reach runtime
-                lg2::info("faultlog host is not in running state create watch "
-                          "for progress state");
-                std::unique_ptr<sdbusplus::bus::match_t> _hostStatePropWatch =
-                    std::make_unique<sdbusplus::bus::match_t>(
-                        bus,
-                        sdbusplus::bus::match::rules::propertiesChanged(
-                            "/xyz/openbmc_project/state/host0",
-                            "xyz.openbmc_project.State.Boot."
-                            "Progress"),
-                        [&bus, &unresolvedRecords](auto& msg) {
-                            propertyChanged(bus, msg);
-                        });
-
                 // during bmc reboot when host is already at runtime state
                 // manager does not notify PropertyChanged signal for
                 // BootProgress. It simply reads the BootProgress from serialize
@@ -373,14 +357,31 @@ int main(int argc, char** argv)
                     if (isHostProgressStateRunning(bus))
                     {
                         lg2::info("faultlog poweron timer host reached running "
-                                  "state. create fautlog pel ");
-                        createHostPowerOnNagPel(bus);
+                                  "state consider it a bmcreboot");
+                        createNagPel(
+                            bus, unresolvedRecords,
+                            !IGNORE_PWR_FAN_PEL); // add as it is bmcreboot
                         timer.setEnabled(false);
                         exit(EXIT_SUCCESS);
                     }
                 };
                 Timer timer(event, std::move(timerCb), hostStateCheckTimeout);
                 timer.setEnabled(true);
+
+                // wait for host to reach runtime
+                lg2::info("faultlog host is not in running state create watch "
+                          "for progress state");
+                std::unique_ptr<sdbusplus::bus::match_t> _hostStatePropWatch =
+                    std::make_unique<sdbusplus::bus::match_t>(
+                        bus,
+                        sdbusplus::bus::match::rules::propertiesChanged(
+                            "/xyz/openbmc_project/state/host0",
+                            "xyz.openbmc_project.State.Boot."
+                            "Progress"),
+                        [&bus, &unresolvedRecords, &timer](auto& msg) {
+                            propertyChanged(bus, msg, timer);
+                        });
+
                 bus.attach_event(event.get(), SD_EVENT_PRIORITY_NORMAL);
                 return event.loop();
             }
@@ -392,7 +393,7 @@ int main(int argc, char** argv)
             // serviceable event records
             (void)GuardWithEidRecords::populate(bus, unresolvedRecords,
                                                 faultLogJson);
-            (void)UnresolvedPELs::populate(bus, unresolvedRecords, hostPowerOn,
+            (void)UnresolvedPELs::populate(bus, unresolvedRecords,
                                            faultLogJson);
 
             //
