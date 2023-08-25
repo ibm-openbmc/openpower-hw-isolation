@@ -161,6 +161,13 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool ignorePwrFanPel)
 
         // read timestamp of poweron PEL
         uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+        // Ignore PELS if chassis poweron pel is not found
+        if (poweronTimestamp == 0)
+        {
+            lg2::info(
+                "Ignoring error PELs as chassis poweron pel is not found ");
+            return count;
+        }
 
         for (const auto& [path, interfaces] : objects)
         {
@@ -310,6 +317,13 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
         reply.read(objects);
 
         uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+        // Ignore PELS if chassis poweron pel is not found
+        if (poweronTimestamp == 0)
+        {
+            lg2::info(
+                "Ignoring error PELs as chassis poweron pel is not found ");
+            return;
+        }
 
         for (const auto& [path, interfaces] : objects)
         {
