@@ -147,7 +147,7 @@ static uint64_t getChassisPoweronErrTimestamp(const Objects& objects)
     return max_timestamp;
 }
 
-int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
+int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool ignorePwrFanPel)
 {
     int count = 0;
     try
@@ -161,6 +161,13 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
 
         // read timestamp of poweron PEL
         uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+        // Ignore PELS if chassis poweron pel is not found
+        if (poweronTimestamp == 0)
+        {
+            lg2::info(
+                "Ignoring error PELs as chassis poweron pel is not found ");
+            return count;
+        }
 
         for (const auto& [path, interfaces] : objects)
         {
@@ -246,7 +253,7 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
                 continue;
             }
 
-            if (hostPowerOn) // invoked as part of start host service
+            if (ignorePwrFanPel)
             {
                 // power and thermal err src starts with 1100
                 if (refCode.substr(0, pwrThermalErrPrefix.length()) ==
@@ -298,8 +305,7 @@ int UnresolvedPELs::getCount(sdbusplus::bus::bus& bus, bool hostPowerOn)
 }
 
 void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
-                              const GuardRecords& guardRecords,
-                              bool hostPowerOn, json& jsonNag)
+                              const GuardRecords& guardRecords, json& jsonNag)
 {
     try
     {
@@ -311,6 +317,13 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
         reply.read(objects);
 
         uint64_t poweronTimestamp = getChassisPoweronErrTimestamp(objects);
+        // Ignore PELS if chassis poweron pel is not found
+        if (poweronTimestamp == 0)
+        {
+            lg2::info(
+                "Ignoring error PELs as chassis poweron pel is not found ");
+            return;
+        }
 
         for (const auto& [path, interfaces] : objects)
         {
@@ -415,18 +428,6 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                 continue;
             }
 
-            if (hostPowerOn)
-            {
-                // power and thermal err src starts with 1100
-                if (refCode.substr(0, pwrThermalErrPrefix.length()) ==
-                    pwrThermalErrPrefix)
-                {
-                    lg2::info("Ignoring power, thermal errors during IPL "
-                              "{OBJECT}",
-                              "OBJECT", path.str);
-                    continue;
-                }
-            }
             // ignore informational and debug errors
             if ((severity == "xyz.openbmc_project.Logging.Entry.Level.Debug") ||
                 (severity == "xyz.openbmc_project.Logging.Entry.Level."
