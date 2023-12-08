@@ -6,6 +6,7 @@
 #include <libguard/guard_interface.hpp>
 #include <phosphor-logging/lg2.hpp>
 #include <util.hpp>
+#include<iostream>
 namespace openpower::faultlog
 {
 
@@ -67,6 +68,7 @@ DeconfigDataList
     for (const auto& elem : guardRecords)
     {
         auto physicalPath = openpower::guard::getPhysicalPath(elem.targetId);
+        //std::cout<<"Phys Path of guarded target: "<<*physicalPath<<std::endl;
         if (!physicalPath.has_value())
         {
             continue;
@@ -106,9 +108,9 @@ void DeconfigRecords::populate(const GuardRecords& guardRecords,
 
     for (const auto& target : onlyDeconfigList.targetList)
     {
+        json deconfigJson = json::object();
         try
         {
-            json deconfigJson = json::object();
             deconfigJson["TYPE"] = pdbgTargetName(target);
             std::string state = stateDeconfigured;
             ATTR_HWAS_STATE_Type hwasState;
@@ -131,7 +133,6 @@ void DeconfigRecords::populate(const GuardRecords& guardRecords,
                         hwasState.deconfiguredByEid));
             }
             deconfigJson["CURRENT_STATE"] = std::move(state);
-
             ATTR_PHYS_DEV_PATH_Type attrPhyDevPath;
             if (!DT_GET_PROP(ATTR_PHYS_DEV_PATH, target, attrPhyDevPath))
             {
@@ -149,15 +150,28 @@ void DeconfigRecords::populate(const GuardRecords& guardRecords,
             ATTR_LOCATION_CODE_Type attrLocCode = {'\0'};
             openpower::phal::pdbg::getLocationCode(target, attrLocCode);
             deconfigJson["LOCATION_CODE"] = attrLocCode;
-
             json header = json::object();
             header["DECONFIGURED"] = std::move(deconfigJson);
             jsonNag.push_back(std::move(header));
         }
         catch (const std::exception& ex)
         {
+             ATTR_PHYS_DEV_PATH_Type phypath;
+             DT_GET_PROP(ATTR_PHYS_DEV_PATH, target, phypath);
+                std::cout<<"path: "<<phypath<<std::endl;
+                const char* foundPos = strstr(phypath,"occ");
+            if(foundPos!=nullptr)
+            {
+            deconfigJson["TYPE"] = "OCC";
+            json header = json::object();
+            header["DECONFIGURED"] = std::move(deconfigJson);
+            jsonNag.push_back(std::move(header));
+            }
+            else
+            {
             lg2::error("Failed to add deconfig records {TARGET} {ERROR}",
                        "TARGET", pdbgTargetName(target), "ERROR", ex.what());
+            }
         }
     }
 }
