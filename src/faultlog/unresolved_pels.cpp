@@ -452,12 +452,6 @@ void UnresolvedPELs::populate(sdbusplus::bus::bus& bus,
                         getGuardReason(guardRecords, *physicalPath);
 
                     jsonResource["GUARD_RECORD"] = true;
-                    ATTR_PHYS_DEV_PATH_Type phyPath;
-                    if (!DT_GET_PROP(ATTR_PHYS_DEV_PATH, guardedTarget.target,
-                                     phyPath))
-                    {
-                        jsonResource["PHYS_PATH"] = phyPath;
-                    }
 
                     break;
                 }

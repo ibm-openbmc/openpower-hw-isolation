@@ -343,11 +343,7 @@ void GuardWithEidRecords::populate(sdbusplus::bus::bus& bus,
                                                                 *physicalPath);
 
             jsonResource["GUARD_RECORD"] = true;
-            ATTR_PHYS_DEV_PATH_Type phyPath;
-            if (!DT_GET_PROP(ATTR_PHYS_DEV_PATH, guardedTarget.target, phyPath))
-            {
-                jsonResource["PHYS_PATH"] = phyPath;
-            }
+
             // An error could create single PEL but multiple guard records,
             // while processing guard records do not create multiple error log
             // sections as the callout data retrieved from the PEL will be the
