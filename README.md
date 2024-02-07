@@ -17,3 +17,6 @@ host.
 meson builddir
 ninja -C builddir
 ```
+
+
+test a
