@@ -21,3 +21,4 @@ ninja -C builddir
 
 test a
 test 2
+test c
