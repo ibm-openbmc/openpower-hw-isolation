@@ -4,9 +4,14 @@
 
 #include "common/utils.hpp"
 
+#include <attributes_info.H>
+
 #include <phosphor-logging/elog-errors.hpp>
 
 #include <format>
+#include <iostream>
+
+using namespace std;
 
 namespace hw_isolation
 {
@@ -205,9 +210,10 @@ std::optional<
     IsolatableHWs::getIsotableHWDetails(
         const IsolatableHWs::HW_Details::HwId& id) const
 {
-    auto it = std::find_if(
-        _isolatableHWsList.begin(), _isolatableHWsList.end(),
-        [&id](const auto& isolatableHw) { return isolatableHw.first == id; });
+    auto it = std::find_if(_isolatableHWsList.begin(), _isolatableHWsList.end(),
+                           [&id](const auto& isolatableHw) {
+        return isolatableHw.first == id;
+    });
 
     if (it != _isolatableHWsList.end())
     {
@@ -461,7 +467,21 @@ std::optional<devtree::DevTreePhysPath> IsolatableHWs::getPhysicalPath(
 
                 if (canGetPhysPath)
                 {
-                    break;
+                    // In scenarios where multiple logical DIMMs are installed,
+                    // and the current DIMM is found to be absent, we must
+                    // proceed to deconfigure the remaining dimm. So check for
+                    // the current dimm's present status
+                    ATTR_HWAS_STATE_Type hwasState;
+                    if (!DT_GET_PROP(ATTR_HWAS_STATE, isolateHwTarget,
+                                     hwasState))
+                    {
+                        // If not present, continue to find the other dimm that
+                        // matches the location code
+                        if (hwasState.present)
+                        {
+                            break;
+                        }
+                    }
                 }
             }
         }
@@ -726,7 +746,7 @@ std::optional<sdbusplus::message::object_path>
             inventoryPathList->begin(), inventoryPathList->end(),
             [&fruInstId, &fruInvPathLookupFunc, this](const auto& path) {
             return fruInvPathLookupFunc(this->_bus, path, fruInstId);
-        });
+            });
 
         if (fruHwInvPath == inventoryPathList->end())
         {
@@ -1030,7 +1050,7 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
                  this](const auto& path) {
                 return isolatedHwDetails->second._invPathFuncLookUp(
                     this->_bus, path, uniqIsolateHwKey);
-            });
+                });
 
             if (isolateHwPath == childsInventoryPath->end())
             {

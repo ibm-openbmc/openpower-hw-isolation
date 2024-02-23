@@ -18,6 +18,8 @@ extern "C"
 
 #include <filesystem>
 #include <format>
+#include <iostream>
+using namespace std;
 
 namespace hw_isolation
 {
@@ -47,7 +49,7 @@ Manager::Manager(sdbusplus::bus::bus& bus, const sdeventplus::Event& eventLoop,
     _bus(bus),
     _eventLoop(eventLoop), _lastEventId(0), _isolatableHWs(bus),
     _hwIsolationRecordMgr(hwIsolationRecordMgr),
-    _requiredHwsPdbgClass({"dimm", "fc"})
+    _requiredHwsPdbgClass({"ocmb", "fc"})
 {
     fs::create_directories(
         fs::path(HW_ISOLATION_EVENT_PERSIST_PATH).parent_path());
@@ -172,6 +174,47 @@ std::pair<event::EventMsg, event::EventSeverity>
     }
 }
 
+int Manager::getHigherPrecendenceEvent(
+    std::vector<event::EventMsg>& entryMsgList)
+{
+    // Check if the eventMsgList has only one element
+    if (entryMsgList.size() == 1)
+    {
+        // If there's only one element, return 0 the index of first element
+        return 0;
+    }
+    else
+    {
+        /*The different deconfig types that are allowed
+        "Fatal", event::EntrySeverity::Critical
+        "Manual", event::EntrySeverity::Ok
+        "Predictive", event::EntrySeverity::Warning
+        "Unknown", event::EntrySeverity::Warning */
+
+        // Define a vector containing Deconfiguration Type in the following
+        // precedence
+        std::vector<event::EventMsg> deconfigTypes = {
+            "Fatal", "Predictive", "Manual", "By Association"};
+
+        // Iterate through each keyword
+        for (const auto& deconfigType : deconfigTypes)
+        {
+            // Iterate through each element in the eventMsgList
+            for (unsigned int i = 0; i < entryMsgList.size(); ++i)
+            {
+                // Check if the current element is of higher precedence
+                if (entryMsgList[i].find(deconfigType))
+                {
+                    // If found, return the index
+                    return i;
+                }
+            }
+        }
+    }
+    // If none of the conditions are met, return 0 to use first index
+    return 0;
+}
+
 void Manager::restoreHardwaresStatusEvent(bool osRunning)
 {
     clearHardwaresStatusEvent();
@@ -203,242 +246,100 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
                         continue;
                     }
                 }
-
-                ATTR_HWAS_STATE_Type hwasState;
-                if (DT_GET_PROP(ATTR_HWAS_STATE, tgt, hwasState))
+                else if (ele == "ocmb")
                 {
-                    log<level::ERR>(
-                        std::format("Skipping to create the hardware "
-                                    "status event because failed to get "
-                                    "ATTR_HWAS_STATE from [{}]",
-                                    pdbg_target_path(tgt))
-                            .c_str());
-                    error_log::createErrorLog(
-                        error_log::HwIsolationGenericErrMsg,
-                        error_log::Level::Informational,
-                        error_log::CollectTraces);
+                    struct pdbg_target* dimmTgt;
+                    struct pdbg_target* mpTgt;
+
+                    vector<event::EventMsg> eventMsgList;
+                    vector<event::EventSeverity> eventSeverityList;
+                    vector<record::entry::EntryErrLogPath> eventErrLogPathList;
+                    // hwInventoryPath - should be the same for both that
+                    // children under that ocmb.
+                    std::optional<sdbusplus::message::object_path>
+                        hwInventoryPath;
+
+                    // dimm0=functional, dimm2=functional : functional (normal
+                    // dualport) dimm0=functional, dimm2=deconfigured : ILLEGAL,
+                    // deconfigured dimm0=functional, dimm2=nonpresent :
+                    // functional (normal singleport) dimm0=deconfigured ,
+                    // dimm2=functional : ILLEGAL, deconfigured
+                    pdbg_for_each_target("mem_port", tgt, mpTgt)
+                    {
+                        pdbg_for_each_target("dimm", mpTgt, dimmTgt)
+                        {
+                            bool createEvent = false;
+                            event::EventMsg eventMsg;
+                            event::EventSeverity eventSeverity;
+                            record::entry::EntryErrLogPath eventErrLogPath;
+                            createEvent = PopulateDetailsToCreateEvent(
+                                dimmTgt, osRunning, eventMsg, eventSeverity,
+                                eventErrLogPath, hwInventoryPath);
+
+                            if (createEvent)
+                            {
+                                eventMsgList.push_back(eventMsg);
+                                eventSeverityList.push_back(eventSeverity);
+                                eventErrLogPathList.push_back(eventErrLogPath);
+                            }
+                        }
+                    }
+
+                    // We have as many number of deconfigurations as there are
+                    // DIMMs
+                    if (eventMsgList.size() > 0)
+                    {
+                        if (!hwInventoryPath.has_value())
+                        {
+                            // already logged error. Continue
+                            continue;
+                        }
+                        auto errSeverityStr =
+                            sdbusplus::xyz::openbmc_project::Logging::server::
+                                convertForMessage(eventSeverityList[0]);
+
+                        // See which isolation record has higher priority and
+                        // use it.
+                        int index = getHigherPrecendenceEvent(eventMsgList);
+
+                        auto eventObjPath = createEvent(
+                            eventSeverityList[index], eventMsgList[index],
+                            hwInventoryPath->str, eventErrLogPathList[index]);
+
+                        if (!eventObjPath.has_value())
+                        {
+                            log<level::ERR>(
+                                std::format(
+                                    "Skipping to create the hardware "
+                                    "status event because unable to create "
+                                    "the event object for the given hardware "
+                                    "[{}]",
+                                    hwInventoryPath->str)
+                                    .c_str());
+                            error_log::createErrorLog(
+                                error_log::HwIsolationGenericErrMsg,
+                                error_log::Level::Informational,
+                                error_log::CollectTraces);
+                        }
+                    }
                     continue;
                 }
 
-                if (hwasState.present)
-                {
-                    ATTR_PHYS_BIN_PATH_Type physBinPath;
-                    if (DT_GET_PROP(ATTR_PHYS_BIN_PATH, tgt, physBinPath))
-                    {
-                        log<level::ERR>(
-                            std::format("Skipping to create the hardware "
-                                        "status event because failed to get "
-                                        "ATTR_PHYS_BIN_PATH from [{}]",
-                                        pdbg_target_path(tgt))
-                                .c_str());
-                        error_log::createErrorLog(
-                            error_log::HwIsolationGenericErrMsg,
-                            error_log::Level::Informational,
-                            error_log::CollectTraces);
-                        continue;
-                    }
+                event::EventMsg eventMsg;
+                event::EventSeverity eventSeverity;
+                record::entry::EntryErrLogPath eventErrLogPath;
+                std::optional<sdbusplus::message::object_path> hwInventoryPath;
 
-                    devtree::DevTreePhysPath devTreePhysPath;
-                    std::copy(std::begin(physBinPath), std::end(physBinPath),
-                              std::back_inserter(devTreePhysPath));
+                PopulateDetailsToCreateEvent(tgt, osRunning, eventMsg,
+                                             eventSeverity, eventErrLogPath,
+                                             hwInventoryPath);
 
-                    // TODO: It is a workaround until fix the following
-                    //       issue ibm-openbmc/dev/issues/3573.
-                    bool ecoCore{false};
-                    auto hwInventoryPath = _isolatableHWs.getInventoryPath(
-                        devTreePhysPath, ecoCore);
-
-                    if (!hwInventoryPath.has_value())
-                    {
-                        log<level::ERR>(
-                            std::format("Skipping to create the hardware "
-                                        "status event because unable to find "
-                                        "the inventory path for the given "
-                                        "hardware [{}]",
-                                        pdbg_target_path(tgt))
-                                .c_str());
-                        error_log::createErrorLog(
-                            error_log::HwIsolationGenericErrMsg,
-                            error_log::Level::Informational,
-                            error_log::CollectTraces);
-                        continue;
-                    }
-
-                    event::EventMsg eventMsg;
-                    event::EventSeverity eventSeverity;
-                    record::entry::EntryErrLogPath eventErrLogPath;
-
-                    auto isolatedhwRecordInfo =
-                        _hwIsolationRecordMgr.getIsolatedHwRecordInfo(
-                            *hwInventoryPath);
-
-                    if (isolatedhwRecordInfo.has_value())
-                    {
-                        if (hwasState.functional)
-                        {
-                            auto functionalInInventory =
-                                utils::getDBusPropertyVal<bool>(
-                                    _bus, hwInventoryPath->str,
-                                    "xyz.openbmc_project.State.Decorator."
-                                    "OperationalStatus",
-                                    "Functional");
-
-                            if (functionalInInventory &&
-                                (hwasState.deconfiguredByEid ==
-                                 openpower_hw_status::DeconfiguredByReason::
-                                     CONFIGURED_BY_RESOURCE_RECOVERY))
-                            {
-                                /**
-                                 * Event is required since the hardware is
-                                 * recovered even thats requested to
-                                 * isolate.
-                                 */
-                                auto dfgReason = openpower_hw_status::
-                                    convertDeconfiguredByReasonFromEnum(
-                                        static_cast<openpower_hw_status::
-                                                        DeconfiguredByReason>(
-                                            hwasState.deconfiguredByEid));
-                                eventMsg = std::get<0>(dfgReason);
-                                eventSeverity = std::get<1>(dfgReason);
-                            }
-                            else if (!functionalInInventory && osRunning)
-                            {
-                                /**
-                                 * Event is required since the hardware is
-                                 * deallocated during OS running.
-                                 *
-                                 * Assumption is, HWAS_STATE won't updated
-                                 * for the runtime deallocation.
-                                 */
-                                eventErrLogPath =
-                                    std::get<1>(*isolatedhwRecordInfo);
-
-                                auto hwStatusInfo = getIsolatedHwStatusInfo(
-                                    std::get<0>(*isolatedhwRecordInfo));
-
-                                eventMsg = std::get<0>(hwStatusInfo);
-                                eventSeverity = std::get<1>(hwStatusInfo);
-                            }
-                            else
-                            {
-                                /**
-                                 * Event is not required since the hardware
-                                 * isolation record is exist and not applied
-                                 * so far.
-                                 */
-                                continue;
-                            }
-                        }
-                        else
-                        {
-                            // Error log might be present or not in the
-                            // record.
-                            eventErrLogPath =
-                                std::get<1>(*isolatedhwRecordInfo);
-
-                            auto hwStatusInfo = getIsolatedHwStatusInfo(
-                                std::get<0>(*isolatedhwRecordInfo));
-
-                            eventMsg = std::get<0>(hwStatusInfo);
-                            eventSeverity = std::get<1>(hwStatusInfo);
-                        }
-                    }
-                    else
-                    {
-                        /**
-                         * Update the "Enabled" property of the hardware
-                         * because, we should allow to manually deconfigure
-                         * a hardware with the hw-isolation record.
-                         */
-                        hw_isolation::utils::setEnabledProperty(
-                            _bus, hwInventoryPath->str, true);
-
-                        if (hwasState.functional)
-                        {
-                            // Event is not required since it is functional
-                            continue;
-                        }
-
-                        if ((hwasState.deconfiguredByEid &
-                             openpower_hw_status::DeconfiguredByReason::
-                                 DECONFIGURED_BY_PLID_MASK) != 0)
-                        {
-                            /**
-                             * Event is required since the hardware is
-                             * temporarily isolated by the error.
-                             */
-                            auto eId = hwasState.deconfiguredByEid;
-                            eventMsg = "Error";
-                            eventSeverity = event::EventSeverity::Critical;
-
-                            auto logObjPath = utils::getBMCLogPath(_bus, eId);
-                            if (!logObjPath.has_value())
-                            {
-                                log<level::ERR>(
-                                    std::format(
-                                        "Skipping to create the hardware "
-                                        "status event because unable to "
-                                        "find the bmc error log object "
-                                        "path for the given "
-                                        "deconfiguration EID [{}] which "
-                                        "isolated the hardware [{}]",
-                                        eId, hwInventoryPath->str)
-                                        .c_str());
-                                error_log::createErrorLog(
-                                    error_log::HwIsolationGenericErrMsg,
-                                    error_log::Level::Informational,
-                                    error_log::CollectTraces);
-                                continue;
-                            }
-                            eventErrLogPath = logObjPath->str;
-                        }
-                        else
-                        {
-                            /**
-                             * Event is required since the hardware is
-                             * temporarily isolated by the respective
-                             * deconfigured reason.
-                             */
-                            auto dfgReason = openpower_hw_status::
-                                convertDeconfiguredByReasonFromEnum(
-                                    static_cast<openpower_hw_status::
-                                                    DeconfiguredByReason>(
-                                        hwasState.deconfiguredByEid));
-                            eventMsg = std::get<0>(dfgReason);
-                            eventSeverity = std::get<1>(dfgReason);
-                        }
-                    }
-
-                    auto eventObjPath = createEvent(eventSeverity, eventMsg,
-                                                    hwInventoryPath->str,
-                                                    eventErrLogPath);
-
-                    if (!eventObjPath.has_value())
-                    {
-                        log<level::ERR>(
-                            std::format(
-                                "Skipping to create the hardware "
-                                "status event because unable to create "
-                                "the event object for the given hardware "
-                                "[{}]",
-                                hwInventoryPath->str)
-                                .c_str());
-                        error_log::createErrorLog(
-                            error_log::HwIsolationGenericErrMsg,
-                            error_log::Level::Informational,
-                            error_log::CollectTraces);
-                        continue;
-                    }
-                }
+                auto eventObjPath = createEvent(eventSeverity, eventMsg,
+                                                hwInventoryPath->str,
+                                                eventErrLogPath);
             }
             catch (const std::exception& e)
             {
-                log<level::ERR>(
-                    std::format("Exception [{}], skipping to create "
-                                "the hardware status event for the given "
-                                "hardware [{}]",
-                                e.what(), pdbg_target_path(tgt))
-                        .c_str());
                 error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
                                           error_log::Level::Informational,
                                           error_log::CollectTraces);
@@ -446,6 +347,227 @@ void Manager::restoreHardwaresStatusEvent(bool osRunning)
             }
         }
     });
+}
+
+bool Manager::PopulateDetailsToCreateEvent(
+    pdbg_target* tgt, bool osRunning, event::EventMsg& eventMsg,
+    event::EventSeverity& eventSeverity,
+    record::entry::EntryErrLogPath& eventErrLogPath,
+    std::optional<sdbusplus::message::object_path>& hwInventoryPath)
+{
+    try
+    {
+        ATTR_HWAS_STATE_Type hwasState;
+        if (DT_GET_PROP(ATTR_HWAS_STATE, tgt, hwasState))
+        {
+            log<level::ERR>(std::format("Skipping to create the hardware "
+                                        "status event because failed to get "
+                                        "ATTR_HWAS_STATE from [{}]",
+                                        pdbg_target_path(tgt))
+                                .c_str());
+            error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                      error_log::Level::Informational,
+                                      error_log::CollectTraces);
+            return false;
+        }
+
+        if (hwasState.present)
+        {
+            ATTR_PHYS_BIN_PATH_Type physBinPath;
+            if (DT_GET_PROP(ATTR_PHYS_BIN_PATH, tgt, physBinPath))
+            {
+                log<level::ERR>(
+                    std::format("Skipping to create the hardware "
+                                "status event because failed to get "
+                                "ATTR_PHYS_BIN_PATH from [{}]",
+                                pdbg_target_path(tgt))
+                        .c_str());
+                error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                          error_log::Level::Informational,
+                                          error_log::CollectTraces);
+                return false;
+            }
+
+            devtree::DevTreePhysPath devTreePhysPath;
+            std::copy(std::begin(physBinPath), std::end(physBinPath),
+                      std::back_inserter(devTreePhysPath));
+
+            // TODO: It is a workaround until fix the following
+            //       issue ibm-openbmc/dev/issues/3573.
+            bool ecoCore{false};
+            hwInventoryPath = _isolatableHWs.getInventoryPath(devTreePhysPath,
+                                                              ecoCore);
+
+            if (!hwInventoryPath.has_value())
+            {
+                log<level::ERR>(
+                    std::format("Skipping to create the hardware "
+                                "status event because unable to find "
+                                "the inventory path for the given "
+                                "hardware [{}]",
+                                pdbg_target_path(tgt))
+                        .c_str());
+                error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                          error_log::Level::Informational,
+                                          error_log::CollectTraces);
+                return false;
+            }
+
+            auto isolatedhwRecordInfo =
+                _hwIsolationRecordMgr.getIsolatedHwRecordInfo(*hwInventoryPath);
+
+            if (isolatedhwRecordInfo.has_value())
+            {
+                if (hwasState.functional)
+                {
+                    auto functionalInInventory =
+                        utils::getDBusPropertyVal<bool>(
+                            _bus, hwInventoryPath->str,
+                            "xyz.openbmc_project.State.Decorator."
+                            "OperationalStatus",
+                            "Functional");
+
+                    if (functionalInInventory &&
+                        (hwasState.deconfiguredByEid ==
+                         openpower_hw_status::DeconfiguredByReason::
+                             CONFIGURED_BY_RESOURCE_RECOVERY))
+                    {
+                        /**
+                         * Event is required since the hardware is
+                         * recovered even thats requested to
+                         * isolate.
+                         */
+                        auto dfgReason = openpower_hw_status::
+                            convertDeconfiguredByReasonFromEnum(
+                                static_cast<
+                                    openpower_hw_status::DeconfiguredByReason>(
+                                    hwasState.deconfiguredByEid));
+                        eventMsg = std::get<0>(dfgReason);
+                        eventSeverity = std::get<1>(dfgReason);
+                    }
+                    else if (!functionalInInventory && osRunning)
+                    {
+                        /**
+                         * Event is required since the hardware is
+                         * deallocated during OS running.
+                         *
+                         * Assumption is, HWAS_STATE won't updated
+                         * for the runtime deallocation.
+                         */
+                        eventErrLogPath = std::get<1>(*isolatedhwRecordInfo);
+
+                        auto hwStatusInfo = getIsolatedHwStatusInfo(
+                            std::get<0>(*isolatedhwRecordInfo));
+
+                        eventMsg = std::get<0>(hwStatusInfo);
+                        eventSeverity = std::get<1>(hwStatusInfo);
+                    }
+                    else
+                    {
+                        /**
+                         * Event is not required since the hardware
+                         * isolation record is exist and not applied
+                         * so far.
+                         */
+                        return false;
+                    }
+                }
+                else
+                {
+                    // Error log might be present or not in the
+                    // record.
+                    eventErrLogPath = std::get<1>(*isolatedhwRecordInfo);
+
+                    auto hwStatusInfo = getIsolatedHwStatusInfo(
+                        std::get<0>(*isolatedhwRecordInfo));
+
+                    eventMsg = std::get<0>(hwStatusInfo);
+                    eventSeverity = std::get<1>(hwStatusInfo);
+                }
+            }
+            else
+            {
+                /**
+                 * Update the "Enabled" property of the hardware
+                 * because, we should allow to manually deconfigure
+                 * a hardware with the hw-isolation record.
+                 */
+                hw_isolation::utils::setEnabledProperty(
+                    _bus, hwInventoryPath->str, true);
+
+                if (hwasState.functional)
+                {
+                    // Event is not required since it is functional
+                    return false;
+                }
+
+                if ((hwasState.deconfiguredByEid &
+                     openpower_hw_status::DeconfiguredByReason::
+                         DECONFIGURED_BY_PLID_MASK) != 0)
+                {
+                    /**
+                     * Event is required since the hardware is
+                     * temporarily isolated by the error.
+                     */
+                    auto eId = hwasState.deconfiguredByEid;
+                    eventMsg = "Error";
+                    eventSeverity = event::EventSeverity::Critical;
+
+                    auto logObjPath = utils::getBMCLogPath(_bus, eId);
+                    if (!logObjPath.has_value())
+                    {
+                        log<level::ERR>(
+                            std::format("Skipping to create the hardware "
+                                        "status event because unable to "
+                                        "find the bmc error log object "
+                                        "path for the given "
+                                        "deconfiguration EID [{}] which "
+                                        "isolated the hardware [{}]",
+                                        eId, hwInventoryPath->str)
+                                .c_str());
+                        error_log::createErrorLog(
+                            error_log::HwIsolationGenericErrMsg,
+                            error_log::Level::Informational,
+                            error_log::CollectTraces);
+                        return false;
+                    }
+                    eventErrLogPath = logObjPath->str;
+                }
+                else
+                {
+                    /**
+                     * Event is required since the hardware is
+                     * temporarily isolated by the respective
+                     * deconfigured reason.
+                     */
+                    auto dfgReason = openpower_hw_status::
+                        convertDeconfiguredByReasonFromEnum(
+                            static_cast<
+                                openpower_hw_status::DeconfiguredByReason>(
+                                hwasState.deconfiguredByEid));
+                    eventMsg = std::get<0>(dfgReason);
+                    eventSeverity = std::get<1>(dfgReason);
+                }
+            }
+            // We need to create an event, so return true
+            return true;
+        }
+        // Not present, so normal DDR4
+        else
+        {
+            return false;
+        }
+    }
+    catch (const std::exception& e)
+    {
+        log<level::ERR>(std::format("Exception [{}], skipping to create "
+                                    "the hardware status event for the given "
+                                    "hardware",
+                                    e.what())
+                            .c_str());
+    }
+
+    return false;
 }
 
 void Manager::clearHwStatusEventIfexists(const std::string& hwInventoryPath)
@@ -820,6 +942,7 @@ void Manager::restore()
     if (osRunning)
     {
         watchOperationalStatusChange();
+        restoreHardwaresStatusEvent();
     }
 }
 

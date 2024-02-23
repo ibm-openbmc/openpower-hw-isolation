@@ -165,6 +165,9 @@ class Manager :
         getIsolatedHwRecordInfo(
             const sdbusplus::message::object_path& hwInventoryPath);
 
+    int getHigherPrecendenceEntry(
+        std::vector<entry::EntrySeverity>& eventSeverityList);
+
   private:
     /**
      *  * @brief Attached bus connection

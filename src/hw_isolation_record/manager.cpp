@@ -15,8 +15,10 @@
 #include <format>
 #include <fstream>
 #include <iomanip>
+#include <iostream>
 #include <ranges>
 #include <sstream>
+using namespace std;
 
 // Associate Manager Class with version number
 constexpr uint32_t Cereal_ManagerClassVersion = 1;
@@ -213,7 +215,7 @@ std::pair<bool, sdbusplus::message::object_path> Manager::updateEntry(
                      [recordId, entityPath](const auto& isolatedHw) {
         return ((isolatedHw.second->getEntityPath() == entityPath) &&
                 (isolatedHw.second->getEntryRecId() == recordId));
-    });
+        });
 
     if (isolatedHwIt == _isolatedHardwares.end())
     {
@@ -679,10 +681,10 @@ void Manager::cleanupPersistedEcoCores()
 
             auto isNotIsolated = std::ranges::none_of(
                 _isolatedHardwares, [ecoCore](const auto& entry) {
-                return (entry.second->getEntityPath() ==
-                        openpower_guard::EntityPath(ecoCore->data(),
-                                                    ecoCore->size()));
-            });
+                    return (entry.second->getEntityPath() ==
+                            openpower_guard::EntityPath(ecoCore->data(),
+                                                        ecoCore->size()));
+                });
 
             if (isNotIsolated)
             {
@@ -844,9 +846,9 @@ void Manager::handleHostIsolatedHardwares()
                 std::stringstream ss;
                 std::for_each(entityPathRawData.begin(),
                               entityPathRawData.end(), [&ss](const auto& ele) {
-                    ss << std::setw(2) << std::setfill('0') << std::hex
-                       << (int)ele << " ";
-                });
+                                  ss << std::setw(2) << std::setfill('0')
+                                     << std::hex << (int)ele << " ";
+                              });
                 log<level::ERR>(std::format("More than one valid records exist "
                                             "for the same hardware [{}]",
                                             ss.str())
@@ -944,42 +946,103 @@ sdbusplus::message::object_path Manager::createWithEntityPath(
     }
 }
 
+int Manager::getHigherPrecendenceEntry(
+    std::vector<entry::EntrySeverity>& entrySeverityList)
+{
+    // Check if the eventMsgList has only one element
+    if (entrySeverityList.size() == 1)
+    {
+        // If there's only one element, return 0 the index of first element
+        return 0;
+    }
+    else
+    {
+        /*The different deconfig types that are allowed
+        "Fatal", event::EntrySeverity::Critical
+        "Manual", event::EntrySeverity::Ok
+        "Predictive", event::EntrySeverity::Warning
+        "Unknown", event::EntrySeverity::Warning */
+
+        // Define a vector containing Deconfiguration Type in the following
+        // precedence
+        vector<entry::EntrySeverity> deconfigTypes = {
+            entry::EntrySeverity::Critical, entry::EntrySeverity::Warning,
+            entry::EntrySeverity::Manual};
+
+        // Iterate through each keyword
+        for (const auto& deconfigType : deconfigTypes)
+        {
+            // Iterate through each element in the eventMsgList
+            for (unsigned int i = 0; i < entrySeverityList.size(); ++i)
+            {
+                // Check if the current element is of higher precedence
+                if (entrySeverityList[i] == deconfigType)
+                {
+                    // If found, return the index
+                    return i;
+                }
+            }
+        }
+    }
+    // If none of the conditions are met, return 0 to use first index
+    return 0;
+}
+
 std::optional<std::tuple<entry::EntrySeverity, entry::EntryErrLogPath>>
     Manager::getIsolatedHwRecordInfo(
         const sdbusplus::message::object_path& hwInventoryPath)
 {
+    // If there is more than one hw isolation entry matching the inventory
+    // The possibility of that is very less as we do not intend to create
+    // more than 1 record per physical dimm.
+    std::vector<hw_isolation::record::IsolatedHardwares::iterator>
+        entriesIterators;
+
     // Make sure whether the given hardware inventory is exists
     // in the record list.
-    auto entryIt = std::find_if(_isolatedHardwares.begin(),
-                                _isolatedHardwares.end(),
-                                [hwInventoryPath](const auto& ele) {
-        for (const auto& assocEle : ele.second->associations())
-        {
-            if (std::get<0>(assocEle) == "isolated_hw")
+    for (auto it = _isolatedHardwares.begin(); it != _isolatedHardwares.end();
+         ++it)
+    {
+        if ([&it, hwInventoryPath]() {
+            for (const auto& assocEle : it->second->associations())
             {
-                return std::get<2>(assocEle) == hwInventoryPath.str;
+                if (std::get<0>(assocEle) == "isolated_hw")
+                {
+                    return std::get<2>(assocEle) == hwInventoryPath.str;
+                }
             }
+            return false;
+        }())
+        {
+            entriesIterators.push_back(it);
         }
+    }
 
-        return false;
-    });
-
-    if (entryIt == _isolatedHardwares.end())
+    // inventory path  not found
+    if (entriesIterators.size() == 0)
     {
         return std::nullopt;
     }
 
-    entry::EntryErrLogPath errLogPath;
-    for (const auto& assocEle : entryIt->second->associations())
-    {
-        if (std::get<0>(assocEle) == "isolated_hw_errorlog")
-        {
-            errLogPath = std::get<2>(assocEle);
-            break;
-        }
-    }
+    vector<entry::EntryErrLogPath> errLogPathList;
+    vector<entry::EntrySeverity> severityList;
 
-    return std::make_tuple(entryIt->second->severity(), errLogPath);
+    // Check which has highest priority and use it
+    for (auto entryIt : entriesIterators)
+    {
+        for (const auto& assocEle : entryIt->second->associations())
+        {
+            if (std::get<0>(assocEle) == "isolated_hw_errorlog")
+            {
+                errLogPathList.push_back(std::get<2>(assocEle));
+                break;
+            }
+        }
+        severityList.push_back(entryIt->second->severity());
+    }
+    int index = getHigherPrecendenceEntry(severityList);
+
+    return std::make_tuple(severityList[index], errLogPathList[index]);
 }
 
 } // namespace record

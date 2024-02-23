@@ -218,6 +218,14 @@ class Manager
      */
     void restoreHardwaresStatusEvent(bool osRunning = false);
 
+    int getHigherPrecendenceEvent(std::vector<event::EventMsg>& eventMsgList);
+
+    bool PopulateDetailsToCreateEvent(
+        pdbg_target* tgt, bool osRunning, event::EventMsg& eventMsg,
+        event::EventSeverity& eventSeverity,
+        record::entry::EntryErrLogPath& eventErrLogPath,
+        std::optional<sdbusplus::message::object_path>& hwInventoryPath);
+
     /**
      * @brief Helper API to restore hardware isolation status event from
      *        the persisted files.
