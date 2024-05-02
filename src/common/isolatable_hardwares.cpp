@@ -207,10 +207,9 @@ std::optional<
     IsolatableHWs::getIsotableHWDetails(
         const IsolatableHWs::HW_Details::HwId& id) const
 {
-    auto it = std::find_if(_isolatableHWsList.begin(), _isolatableHWsList.end(),
-                           [&id](const auto& isolatableHw) {
-        return isolatableHw.first == id;
-    });
+    auto it = std::find_if(
+        _isolatableHWsList.begin(), _isolatableHWsList.end(),
+        [&id](const auto& isolatableHw) { return isolatableHw.first == id; });
 
     if (it != _isolatableHWsList.end())
     {
@@ -637,7 +636,7 @@ std::optional<struct pdbg_target*>
          */
         if ((fruUnitPdbgClass == "adc") ||
             (fruUnitPdbgClass == "gpio_expander") ||
-            (fruUnitPdbgClass == "pmic"))
+            (fruUnitPdbgClass == "pmic") || (fruUnitPdbgClass == "mem_port"))
         {
             /**
              * The "adc", "gpio_expander", and "pmic" units are placed under
@@ -647,28 +646,12 @@ std::optional<struct pdbg_target*>
              */
             devTreeTgt = pdbg_target_parent("ocmb", devTreeTgt);
         }
-        /**
-         * Though ocmb has Location Code available now we need to use dimm
-         * location code in case of bonnell.
+        /** As ocmb has location code(which matches either dimm location code
+         *  or the planar based on the type of the system), returning ocmb
+         * target for "adc", "pmic",  "gpio_expander", "mem_port" to support all
+         * the systems.
          */
-        auto dimmCount = 0;
-        struct pdbg_target* lastDimmTgt = nullptr;
-        pdbg_for_each_target("dimm", devTreeTgt, lastDimmTgt)
-        {
-            parentFruTarget = lastDimmTgt;
-            ++dimmCount;
-        }
-
-        if (dimmCount == 0)
-        {
-            log<level::ERR>(
-                std::format("Failed to get the parent dimm target "
-                            "from phal cec device tree for the given phal cec "
-                            "device tree target [{}]",
-                            fruUnitDevTreePath)
-                    .c_str());
-            return std::nullopt;
-        }
+        return devTreeTgt;
     }
     else
     {
@@ -736,7 +719,7 @@ std::optional<sdbusplus::message::object_path>
             inventoryPathList->begin(), inventoryPathList->end(),
             [&fruInstId, &fruInvPathLookupFunc, this](const auto& path) {
             return fruInvPathLookupFunc(this->_bus, path, fruInstId);
-            });
+        });
 
         if (fruHwInvPath == inventoryPathList->end())
         {
@@ -1040,7 +1023,7 @@ std::optional<sdbusplus::message::object_path> IsolatableHWs::getInventoryPath(
                  this](const auto& path) {
                 return isolatedHwDetails->second._invPathFuncLookUp(
                     this->_bus, path, uniqIsolateHwKey);
-                });
+            });
 
             if (isolateHwPath == childsInventoryPath->end())
             {
@@ -1100,6 +1083,18 @@ IsItIsoHwInvPath itemPrettyName(sdbusplus::bus::bus& bus,
     {
         auto retPrettyName = utils::getDBusPropertyVal<std::string>(
             bus, objPath, "xyz.openbmc_project.Inventory.Item", "PrettyName");
+        // Hard coding pretty names as a Workaround for bonnell
+        if (std::get<std::string>(prettyName) == "OpenCAPI Memory Buffer")
+            return ((retPrettyName == "OpenCAPI Memory Buffer 2A") ||
+                    (retPrettyName == "OpenCAPI Memory Buffer"));
+        if (std::get<std::string>(prettyName) == "DDR Memory Port")
+            return ((retPrettyName == "DDR Memory Port 2A") ||
+                    (retPrettyName == "DDR Memory Port"));
+        if (std::get<std::string>(prettyName) ==
+            "Onboard Memory Power Management IC")
+            return ((retPrettyName ==
+                     "Onboard Memory Power Management IC for 2A and 2B") ||
+                    (retPrettyName == "Onboard Memory Power Management IC"));
 
         return retPrettyName == std::get<std::string>(prettyName);
     }
