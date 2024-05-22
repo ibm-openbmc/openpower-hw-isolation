@@ -1135,6 +1135,18 @@ IsItIsoHwInvPath itemPrettyName(sdbusplus::bus::bus& bus,
     {
         auto retPrettyName = utils::getDBusPropertyVal<std::string>(
             bus, objPath, "xyz.openbmc_project.Inventory.Item", "PrettyName");
+        // Hard coding pretty names as a Workaround for bonnell
+        if (std::get<std::string>(prettyName) == "OpenCAPI Memory Buffer")
+            return ((retPrettyName == "OpenCAPI Memory Buffer 2A") ||
+                    (retPrettyName == "OpenCAPI Memory Buffer"));
+        if (std::get<std::string>(prettyName) == "DDR Memory Port")
+            return ((retPrettyName == "DDR Memory Port 2A") ||
+                    (retPrettyName == "DDR Memory Port"));
+        if (std::get<std::string>(prettyName) ==
+            "Onboard Memory Power Management IC")
+            return ((retPrettyName ==
+                     "Onboard Memory Power Management IC for 2A and 2B") ||
+                    (retPrettyName == "Onboard Memory Power Management IC"));
 
         return retPrettyName == std::get<std::string>(prettyName);
     }
