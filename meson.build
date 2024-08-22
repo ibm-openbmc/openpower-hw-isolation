@@ -4,10 +4,10 @@ project('hardware_isolation', 'cpp', 'c',
     default_options: [
       'buildtype=debugoptimized',
       'warning_level=3',
-      'cpp_std=c++20',
+      'cpp_std=c++23',
       'werror=true',
     ],
-    meson_version: '>=0.58.0',
+    meson_version: '>=1.1.1',
     version: '1.0.0',
 )
 
