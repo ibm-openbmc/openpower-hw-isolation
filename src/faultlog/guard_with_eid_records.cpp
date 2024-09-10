@@ -77,6 +77,12 @@ int GuardWithEidRecords::getCount(sdbusplus::bus::bus& bus,
         {
             continue;
         }
+        if (elem.errType ==
+            static_cast<uint8_t>(openpower::guard::GardType::GARD_Spare))
+        {
+            // if guarded due to spare ignore it
+            continue;
+        }
         auto physicalPath = openpower::guard::getPhysicalPath(elem.targetId);
         if (!physicalPath.has_value())
         {
@@ -189,6 +195,12 @@ void GuardWithEidRecords::populate(sdbusplus::bus::bus& bus,
             // ignore manual guard records
             if (elem.elogId == 0)
             {
+                continue;
+            }
+            if (elem.errType ==
+                static_cast<uint8_t>(openpower::guard::GardType::GARD_Spare))
+            {
+                // if guarded due to spare ignore it
                 continue;
             }
             auto physicalPath =

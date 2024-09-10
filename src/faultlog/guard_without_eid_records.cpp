@@ -83,6 +83,12 @@ int GuardWithoutEidRecords::getCount(const GuardRecords& guardRecords)
             // only cater guards without a PEL
             continue;
         }
+        if (elem.errType ==
+            static_cast<uint8_t>(openpower::guard::GardType::GARD_Spare))
+        {
+            // if guarded due to spare ignore it
+            continue;
+        }
         auto physicalPath = openpower::guard::getPhysicalPath(elem.targetId);
         if (!physicalPath.has_value())
         {
@@ -109,6 +115,12 @@ void GuardWithoutEidRecords::populate(const GuardRecords& guardRecords,
             if (elem.elogId != 0)
             {
                 // only cater guards without a PEL
+                continue;
+            }
+            if (elem.errType ==
+                static_cast<uint8_t>(openpower::guard::GardType::GARD_Spare))
+            {
+                // if guarded due to spare ignore it
                 continue;
             }
             auto physicalPath =
