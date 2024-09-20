@@ -231,6 +231,24 @@ int main(int argc, char** argv)
         nlohmann::json system;
         system["SYSTEM_TYPE"] = propVal;
 
+        std::string systemSN{};
+        try
+        {
+            auto pVal = readProperty<Binary>(
+                bus, "xyz.openbmc_project.Inventory.Manager",
+                "/xyz/openbmc_project/inventory/system/chassis/"
+                "motherboard",
+                "com.ibm.ipzvpd.VSYS", "SE");
+            systemSN.assign(reinterpret_cast<const char*>(pVal.data()),
+                            pVal.size());
+        }
+        catch (const std::exception& ex)
+        {
+            std::cout << "failed to get system s/n " << std::endl;
+        }
+        nlohmann::json system;
+        system["SYSTEM_SN"] = systemSN;
+
         nlohmann::json systemHdr;
         systemHdr["SYSTEM"] = std::move(system);
         faultLogJson.push_back(systemHdr);
