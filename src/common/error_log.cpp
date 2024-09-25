@@ -423,5 +423,38 @@ void createErrorLog(const std::string& errMsg, const Level& errSeverity,
     }
 }
 
+void deleteErrorLog(const std::string& errorLogPath)
+{
+    try
+    {
+        auto bus = sdbusplus::bus::new_default();
+        std::string service = utils::getDBusServiceName(
+            bus, type::LoggingObjectPath, type::LoggingCreateIface);
+        auto method = bus.new_method_call(service.c_str(), errorLogPath.c_str(),
+                                          type::LoggingDeleteIface, "Delete");
+        auto resp = bus.call(method);
+    }
+    catch (const sdbusplus::exception::exception& e)
+    {
+        // Don't throw the exception, we should allow the caller to proceed
+        // further since caller might call this in the failure case.
+        log<level::ERR>(std::format("D-Bus Exception [{}], failed to delete "
+                                    "the error log for ObjectPath [{}] "
+                                    "and Interface [{}]",
+                                    e.what(), errorLogPath,
+                                    type::LoggingDeleteIface)
+                            .c_str());
+    }
+    catch (const std::exception& e)
+    {
+        // Don't throw the exception, we should allow the caller to proceed
+        // further since caller might call this in the failure case.
+        log<level::ERR>(
+            std::format("Exception [{}], failed to delete the error log",
+                        e.what())
+                .c_str());
+    }
+}
+
 } // namespace error_log
 } // namespace hw_isolation

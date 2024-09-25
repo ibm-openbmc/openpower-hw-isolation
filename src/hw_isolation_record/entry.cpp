@@ -2,6 +2,7 @@
 
 #include "hw_isolation_record/entry.hpp"
 
+#include "common/error_log.hpp"
 #include "common/utils.hpp"
 #include "hw_isolation_record/manager.hpp"
 
@@ -90,7 +91,11 @@ void Entry::resolveEntry(bool clearRecord)
             {
                 hw_isolation::utils::setEnabledProperty(
                     _bus, std::get<2>(assoc), true);
-                break;
+            }
+            if (std::get<0>(assoc) == "isolated_hw_errorlog")
+            {
+                hw_isolation::error_log::deleteErrorLog(
+                    std::string(std::get<2>(assoc)));
             }
         }
 
