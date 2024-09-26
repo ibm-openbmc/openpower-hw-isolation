@@ -66,6 +66,12 @@ DeconfigDataList
     std::vector<std::string> pathList;
     for (const auto& elem : guardRecords)
     {
+        if (elem.errType ==
+            static_cast<uint8_t>(openpower::guard::GardType::GARD_Spare))
+        {
+            // if guarded due to spare ignore it
+            continue;
+        }
         auto physicalPath = openpower::guard::getPhysicalPath(elem.targetId);
         if (!physicalPath.has_value())
         {
