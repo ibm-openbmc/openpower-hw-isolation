@@ -32,6 +32,7 @@ constexpr auto ObjectMapperPath = "/xyz/openbmc_project/object_mapper";
 constexpr auto LoggingObjectPath = "/xyz/openbmc_project/logging";
 constexpr auto LoggingInterface = "org.open_power.Logging.PEL";
 constexpr auto LoggingCreateIface = "xyz.openbmc_project.Logging.Create";
+constexpr auto LoggingDeleteIface = "xyz.openbmc_project.Object.Delete";
 
 constexpr InstanceId Invalid_InstId = 0xFFFFFFFF;
 
