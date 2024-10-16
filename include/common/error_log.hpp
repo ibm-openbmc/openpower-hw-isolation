@@ -267,5 +267,7 @@ void createErrorLog(const std::string& errMsg, const Level& errSeverity,
                     const bool collectTraces = CollectTraces,
                     const json& calloutsDetails = {});
 
+void deleteErrorLog(const std::string& errorLogPath);
+
 } // namespace error_log
 } // namespace hw_isolation
