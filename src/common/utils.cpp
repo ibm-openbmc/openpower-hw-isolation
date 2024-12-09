@@ -2,6 +2,7 @@
 
 #include "common/utils.hpp"
 
+#include "common/error_log.hpp"
 #include "common/phal_devtree_utils.hpp"
 
 #include <xyz/openbmc_project/State/Chassis/server.hpp>
@@ -248,7 +249,8 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
 }
 
 std::optional<sdbusplus::message::object_path>
-    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid)
+    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid,
+                  bool createPELWithError)
 {
     // If EID is "0" means, no bmc error log.
     if (eid == 0)
@@ -278,11 +280,20 @@ std::optional<sdbusplus::message::object_path>
     catch (const sdbusplus::exception::SdBusError& e)
     {
         log<level::ERR>(
-            std::format("Exception [{}] when trying to get BMC log path "
-                        "for the given EID (aka PEL ID) [{}]",
-                        e.what(), eid)
+            std::format(
+                "Exception [{}] when trying to get BMC log path "
+                "for the given EID (aka PEL ID) [{}], removing the PEL association",
+                e.what(), eid)
                 .c_str());
-        return std::nullopt;
+        if (createPELWithError)
+        {
+            error_log::createErrorLog(error_log::HwIsolationGenericErrMsg,
+                                      error_log::Level::Informational,
+                                      error_log::CollectTraces);
+        }
+        // Return the default path,  the record shall be displayed without the
+        // errorlog association
+        return sdbusplus::message::object_path();
     }
 }
 

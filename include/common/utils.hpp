@@ -181,12 +181,15 @@ void setEnabledProperty(sdbusplus::bus::bus& bus,
  *
  * @param[in] bus - Bus to attach to.
  * @param[in] eid - The EID (aka PEL ID) to get BMC log object path
+ * @param[in] createPELWithError - A flag to indicate if an error needs to be
+ * created if the errorlog object path is not found
  *
  * @return The BMC log object path
  *         Empty optional on failure
  */
 std::optional<sdbusplus::message::object_path>
-    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid);
+    getBMCLogPath(sdbusplus::bus::bus& bus, const uint32_t eid,
+                  bool createPELWithError = false);
 
 /**
  * @brief Helper function to get the instance id from the given
