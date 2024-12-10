@@ -156,7 +156,7 @@ void createPELWithSystemGuard(struct GuardedTarget &guardedTarget,
                             static_cast<uint8_t>(0x01), fd}};
     pel::createPelWithFFDCfiles(event, additionalData, severity, ffdcInfo);
   } catch (const std::exception &ex) {
-    std::cerr << "Failed to create guard" << std::endl;
+    std::cout << "Failed to create guard" << std::endl;
   }
 }
 
@@ -176,7 +176,7 @@ int main(int argc, char **argv) {
     openpower::guard::libguard_init();
 
     if (phyDevPath.empty()) {
-      std::cerr << "Please enter a valid target physical path" << std::endl;
+      std::cout << "Please enter a valid target physical path" << std::endl;
       return -1;
     }
 
@@ -186,26 +186,24 @@ int main(int argc, char **argv) {
                              [](unsigned char c) { return std::tolower(c); });
       *sev = severity;
       if (severity != "predictive" && severity != "fatal") {
-        std::cerr << "Please enter a valid severity" << std::endl;
+        std::cout << "Please enter a valid severity" << std::endl;
       }
     } else {
       *sev = "predictive";
     }
-    std::cerr << "Creating System guard of type " << *sev
-              << " on the target with physical path " << phyDevPath
-              << std::endl;
+   
     constexpr auto devtree =
         "/var/lib/phosphor-software-manager/pnor/rw/DEVTREE";
 
     // PDBG_DTB environment variable set to CEC device tree path
     if (setenv("PDBG_DTB", devtree, 1)) {
-      std::cerr << "Failed to set PDBG_DTB: " << strerror(errno) << std::endl;
+      std::cout << "Failed to set PDBG_DTB: " << strerror(errno) << std::endl;
       return -1;
     }
 
     // initialize the targeting system
     if (!pdbg_targets_init(NULL)) {
-      std::cerr << "pdbg_targets_init failed" << std::endl;
+      std::cout << "pdbg_targets_init failed" << std::endl;
       return -1;
     }
 
@@ -215,12 +213,15 @@ int main(int argc, char **argv) {
     GuardedTarget guardedTarget(getDevTreePhyPathFormat(phyDevPath));
     auto ret = pdbg_target_traverse(nullptr, getGuardedTarget, &guardedTarget);
     if (ret == 0) {
-      std::cerr << "Please enter a valid physical path" << std::endl;
+      std::cout << "Please enter a valid physical path" << std::endl;
       return -1;
     }
+    std::cout << "Creating System guard of type " << *sev
+              << " on the target with physical path " << phyDevPath
+              << std::endl;
     createPELWithSystemGuard(guardedTarget, *sev);
   } catch (const std::exception &ex) {
-    std::cerr << "Exception: " << ex.what() << std::endl;
+    std::cout << "Exception: " << ex.what() << std::endl;
   }
   return 0;
 }
