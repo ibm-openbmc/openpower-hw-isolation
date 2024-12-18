@@ -8,9 +8,12 @@
 
 #include <string>
 #include <vector>
-namespace openpower {
-namespace guard {
-namespace pel {
+namespace openpower
+{
+namespace guard
+{
+namespace pel
+{
 using FFDCData = std::vector<std::pair<std::string, std::string>>;
 
 using FFDCInfo = std::vector<std::tuple<
@@ -34,10 +37,10 @@ using namespace openpower::phal;
  * @param  ffcdInfo - a vector of tuples containing ffdc file info
  * @return Platform log id or 0 if error
  */
-uint32_t createPelWithFFDCfiles(const std::string &event,
-                                const FFDCData &ffdcData,
-                                const Severity &severity,
-                                const FFDCInfo &ffdcInfo);
+uint32_t createPelWithFFDCfiles(const std::string& event,
+                                const FFDCData& ffdcData,
+                                const Severity& severity,
+                                const FFDCInfo& ffdcInfo);
 
 /**
  * @brief Get DBUS service for input interface via mapper call
@@ -48,8 +51,8 @@ uint32_t createPelWithFFDCfiles(const std::string &event,
  *
  * @return distinct dbus name for input interface/path
  **/
-std::string getService(sdbusplus::bus::bus &bus, const std::string &intf,
-                       const std::string &path);
+std::string getService(sdbusplus::bus::bus& bus, const std::string& intf,
+                       const std::string& path);
 
 /**
  * @class FFDCFile
@@ -58,47 +61,48 @@ std::string getService(sdbusplus::bus::bus &bus, const std::string &intf,
  * Example FFDC file : phalPELCalloutsJson.nxUHIp
  * [{"EntityPath":[35,1,0,2,0,3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0],"GuardType":"GARD_Fatal","Guarded":true,"LocationCode":"Ufcs-P0-C12","Priority":"H","physical_path":"physical:sys-0/node-0/dimm-0","severity":"fatal"}]
  */
-class FFDCFile {
-public:
-  FFDCFile() = delete;
-  FFDCFile(const FFDCFile &) = delete;
-  FFDCFile &operator=(const FFDCFile &) = delete;
-  FFDCFile(FFDCFile &&) = delete;
-  FFDCFile &operator=(FFDCFile &&) = delete;
+class FFDCFile
+{
+  public:
+    FFDCFile() = delete;
+    FFDCFile(const FFDCFile&) = delete;
+    FFDCFile& operator=(const FFDCFile&) = delete;
+    FFDCFile(FFDCFile&&) = delete;
+    FFDCFile& operator=(FFDCFile&&) = delete;
 
-  /**
-   * Used to pass json object to create unique ffdc file by using
-   * passed json data.
-   */
-  explicit FFDCFile(const json &pHALCalloutData);
+    /**
+     * Used to pass json object to create unique ffdc file by using
+     * passed json data.
+     */
+    explicit FFDCFile(const json& pHALCalloutData);
 
-  /**
-   * Used to remove created ffdc file.
-   */
-  ~FFDCFile();
+    /**
+     * Used to remove created ffdc file.
+     */
+    ~FFDCFile();
 
-  /**
-   * Used to get created ffdc file file descriptor id.
-   *
-   * @return file descriptor id
-   */
-  int getFileFD() const;
+    /**
+     * Used to get created ffdc file file descriptor id.
+     *
+     * @return file descriptor id
+     */
+    int getFileFD() const;
 
-private:
-  /**
-   * Used to store callout ffdc data from passed json object.
-   */
-  std::string calloutData;
+  private:
+    /**
+     * Used to store callout ffdc data from passed json object.
+     */
+    std::string calloutData;
 
-  /**
-   * Used to store unique ffdc file name.
-   */
-  std::string calloutFile;
+    /**
+     * Used to store unique ffdc file name.
+     */
+    std::string calloutFile;
 
-  /**
-   * Used to store created ffdc file descriptor id.
-   */
-  int fileFD;
+    /**
+     * Used to store created ffdc file descriptor id.
+     */
+    int fileFD;
 
 }; // FFDCFile end
 
