@@ -76,6 +76,15 @@ void clear(const uint32_t recordId)
     CALL_LIBGUARD_INTERFACE(libguard::clear(recordId);)
 }
 
+bool isCore(const EntityPath& entityPath)
+{
+    bool isCore = false;
+
+    CALL_LIBGUARD_INTERFACE(isCore = libguard::isCore(entityPath);)
+    
+    return isCore;
+}
+
 void clearAll()
 {
     CALL_LIBGUARD_INTERFACE(libguard::invalidateAll();)

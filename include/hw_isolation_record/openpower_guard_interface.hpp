@@ -46,6 +46,16 @@ std::optional<GuardRecord> create(const EntityPath& entityPath,
 void clear(const uint32_t recordId);
 
 /**
+ * @brief Wrapper function for libguard::isCore to find if it is a core guard
+ *
+ * @param[in] entityPath - the hardware path of the record
+ *
+ * @return NULL on success
+ *         Throw exception on failure
+ */
+bool isCore(const EntityPath& entityPath);
+
+/**
  * @brief Wrapper function for libguard::invalidateAll to delete all guard
  * records
  *
