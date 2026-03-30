@@ -185,7 +185,9 @@ int main(int argc, char **argv) {
       std::ranges::transform(severity, severity.begin(),
                              [](unsigned char c) { return std::tolower(c); });
       *sev = severity;
-      if (severity != "predictive" && severity != "fatal") {
+      if (severity != "predictive" && severity != "fatal" &&
+          severity != "unrecoverable")
+      {
         std::cerr << "Please enter a valid severity" << std::endl;
       }
     } else {
