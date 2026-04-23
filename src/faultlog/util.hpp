@@ -104,4 +104,33 @@ bool isECOcore(struct pdbg_target* target);
  * @return name of the target
  */
 std::string pdbgTargetName(struct pdbg_target* target);
+
+/**
+ * @brief Structure to hold PEL properties
+ */
+struct PELProperties
+{
+    bool resolved{true};
+    bool deconfigured{false};
+    bool guarded{false};
+    bool hidden{false};
+    uint64_t timestamp{0};
+    uint32_t plid{0};
+    std::string severity;
+    std::string refCode;
+    std::string callouts;
+};
+
+/**
+ * @brief Iterate through all PELs and invoke callback for each
+ *
+ * @param[in] bus - D-Bus handle
+ * @param[in] callback - Function to call for each PEL with path and properties
+ * @return true if iteration completed successfully
+ */
+bool forEachPEL(sdbusplus::bus::bus& bus,
+                std::function<bool(const sdbusplus::message::object_path&,
+                                   const PELProperties&)>
+                    callback);
+
 } // namespace openpower::faultlog

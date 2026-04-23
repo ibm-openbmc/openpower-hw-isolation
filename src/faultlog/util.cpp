@@ -105,7 +105,7 @@ json parseCallout(const std::string callout)
 
     // Regular expression to capture key-value pairs (ignores the starting
     // number)
-    // Example 
+    // Example
     // 1. LocationCode:xxxx, CCIN:XXX, SN:xxxx, PN:xxxx, Priority:xxx
     // 2. PN:xxxx, Priority:xxx
     std::regex pattern(
@@ -117,7 +117,7 @@ json parseCallout(const std::string callout)
     while (std::getline(stream, line))
     {
         if (!line.empty())
-        { // Ignore empty lines
+        {                    // Ignore empty lines
             lineCount += 1;
             json jsonObject; // JSON object to hold key-value pairs
             std::smatch matches;
@@ -197,6 +197,135 @@ std::string pdbgTargetName(struct pdbg_target* target)
     }
     auto trgtName = pdbg_target_name(target);
     return (trgtName ? trgtName : "");
+}
+
+bool forEachPEL(sdbusplus::bus::bus& bus,
+                std::function<bool(const sdbusplus::message::object_path&,
+                                   const PELProperties&)>
+                    callback)
+{
+    try
+    {
+        using PropertyValue =
+            std::variant<std::string, bool, uint8_t, int16_t, uint16_t, int32_t,
+                         uint32_t, int64_t, uint64_t, double>;
+        using Properties = std::map<std::string, PropertyValue>;
+        using Interfaces = std::map<std::string, Properties>;
+        using Objects = std::map<sdbusplus::message::object_path, Interfaces>;
+
+        auto method = bus.new_method_call(
+            "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+            "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
+        auto reply = bus.call(method);
+
+        Objects objects;
+        reply.read(objects);
+
+        for (const auto& [path, interfaces] : objects)
+        {
+            PELProperties props;
+
+            // Parse logging entry interface
+            for (const auto& [intf, properties] : interfaces)
+            {
+                if (intf == "xyz.openbmc_project.Logging.Entry")
+                {
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "Resolved")
+                        {
+                            if (const auto* ptr = std::get_if<bool>(&propValue))
+                            {
+                                props.resolved = *ptr;
+                            }
+                        }
+                        else if (prop == "Severity")
+                        {
+                            if (const auto* ptr =
+                                    std::get_if<std::string>(&propValue))
+                            {
+                                props.severity = *ptr;
+                            }
+                        }
+                        else if (prop == "EventId")
+                        {
+                            if (const auto* ptr =
+                                    std::get_if<std::string>(&propValue))
+                            {
+                                // EventId B700900B 00000072 00010016 ...
+                                // First value is RefCode
+                                std::istringstream iss(*ptr);
+                                iss >> props.refCode;
+                            }
+                        }
+                        else if (prop == "Resolution")
+                        {
+                            if (const auto* ptr =
+                                    std::get_if<std::string>(&propValue))
+                            {
+                                props.callouts = *ptr;
+                            }
+                        }
+                    }
+                }
+                else if (intf == "org.open_power.Logging.PEL.Entry")
+                {
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "PlatformLogID")
+                        {
+                            if (const auto* ptr =
+                                    std::get_if<uint32_t>(&propValue))
+                            {
+                                props.plid = *ptr;
+                            }
+                        }
+                        else if (prop == "Deconfig")
+                        {
+                            if (const auto* ptr = std::get_if<bool>(&propValue))
+                            {
+                                props.deconfigured = *ptr;
+                            }
+                        }
+                        else if (prop == "Guard")
+                        {
+                            if (const auto* ptr = std::get_if<bool>(&propValue))
+                            {
+                                props.guarded = *ptr;
+                            }
+                        }
+                        else if (prop == "Hidden")
+                        {
+                            if (const auto* ptr = std::get_if<bool>(&propValue))
+                            {
+                                props.hidden = *ptr;
+                            }
+                        }
+                        else if (prop == "Timestamp")
+                        {
+                            if (const auto* ptr =
+                                    std::get_if<uint64_t>(&propValue))
+                            {
+                                props.timestamp = *ptr;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Invoke callback - if it returns false, stop iteration
+            if (!callback(path, props))
+            {
+                return true;
+            }
+        }
+        return true;
+    }
+    catch (const std::exception& ex)
+    {
+        lg2::error("Failed to iterate PELs: {ERROR}", "ERROR", ex);
+        return false;
+    }
 }
 
 } // namespace openpower::faultlog

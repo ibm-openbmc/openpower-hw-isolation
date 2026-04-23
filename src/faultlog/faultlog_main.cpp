@@ -15,6 +15,7 @@
 #include <sdeventplus/clock.hpp>
 #include <sdeventplus/source/event.hpp>
 #include <sdeventplus/utility/timer.hpp>
+#include <service_alerts_time.hpp>
 #include <unresolved_pels.hpp>
 #include <util.hpp>
 
@@ -99,6 +100,42 @@ void createNagPel(sdbusplus::bus::bus& bus,
     // manual guard or FCO
     if ((guardCount > 0) || (unresolvedPelsCount > 0))
     {
+        // Check if service alerts are enabled before creating nag PEL
+        if (!isSendServiceAlertsEnabled(bus))
+        {
+            lg2::info("Service alerts disabled, checking for new errors");
+
+            // Check if timestamp file exists
+            auto disabledTime = readDisabledTimestamp();
+            if (!disabledTime.has_value())
+            {
+                // No timestamp file - this shouldn't happen, but treat as
+                // never disabled and re-enable
+                lg2::info(
+                    "No timestamp file found, re-enabling service alerts");
+                enableServiceAlerts(bus);
+            }
+            else
+            {
+                // Check if new errors occurred since disabled
+                if (hasNewErrorsSinceDisabled(bus, unresolvedRecords,
+                                              *disabledTime))
+                {
+                    lg2::info(
+                        "New errors detected, re-enabling service alerts");
+                    enableServiceAlerts(bus);
+                    // Continue to create PEL below
+                }
+                else
+                {
+                    lg2::info(
+                        "Service alerts disabled, skipping nag PEL creation");
+                    lg2::info("No new errors found since nagging was disabled");
+                    return; // Skip PEL creation
+                }
+            }
+        }
+
         std::unordered_map<std::string, std::string> data = {
             {"GUARD_RECORD_COUNT", std::to_string(guardCount)},
             {"PEL_WITH_DECONFIG_BIT_COUNT",
@@ -229,7 +266,7 @@ int main(int argc, char** argv)
         auto event = sdeventplus::Event::get_default();
         nlohmann::json faultLogJson = json::array();
 
-        nlohmann::json version;        
+        nlohmann::json version;
         version["VERSION"] = FAULTLOG_FORMAT_VERSION;
         faultLogJson.push_back(version);
 

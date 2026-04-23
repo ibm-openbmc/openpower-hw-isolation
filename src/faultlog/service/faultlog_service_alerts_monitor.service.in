@@ -1,0 +1,12 @@
+[Unit]
+Description=Monitor service alerts property changes and update timestamp
+After=phosphor-settings-manager.service
+Wants=phosphor-settings-manager.service
+
+[Service]
+Restart=always
+Type=simple
+ExecStart=@bindir@/faultlog-service-alerts-monitor
+
+[Install]
+WantedBy=multi-user.target
