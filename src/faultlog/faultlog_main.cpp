@@ -229,7 +229,7 @@ int main(int argc, char** argv)
         auto event = sdeventplus::Event::get_default();
         nlohmann::json faultLogJson = json::array();
 
-        nlohmann::json version;        
+        nlohmann::json version;
         version["VERSION"] = FAULTLOG_FORMAT_VERSION;
         faultLogJson.push_back(version);
 
