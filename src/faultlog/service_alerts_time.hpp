@@ -53,4 +53,10 @@ std::optional<time_t> readDisabledTimestamp(const std::string& filePath = "");
  */
 bool checkUnresolvedPELs(sdbusplus::bus::bus& bus, uint64_t disabledTime);
 
+/**
+ * @brief Re-enable service alerts when new errors are detected
+ *
+ * @param[in] bus - D-Bus to attach to
+ */
+void enableServiceAlerts(sdbusplus::bus::bus& bus);
 } // namespace openpower::faultlog
