@@ -34,6 +34,23 @@ void writeDisabledTimestamp(const std::string& filePath = "");
  */
 std::optional<time_t> readDisabledTimestamp(const std::string& filePath = "");
 
-} // namespace openpower::faultlog
+/**
+ * @brief Check for new unresolved PELs created after service alerts were
+ * disabled
+ *
+ * This function queries the logging service for unresolved Platform Event Logs
+ * (PELs) that have the deconfig bit set and were created after the specified
+ * disabled time. It filters out guarded and hidden PELs as they are handled
+ * separately.
+ *
+ * @param[in] bus - D-Bus connection to use for querying logging service
+ * @param[in] disabledTime - Timestamp (in seconds since epoch) when service
+ *                           alerts were disabled. PELs created after this time
+ *                           are considered "new"
+ *
+ * @return true if at least one new unresolved PEL with deconfig bit set is
+ *         found after the disabled time, false otherwise
+ */
+bool checkUnresolvedPELs(sdbusplus::bus::bus& bus, uint64_t disabledTime);
 
-// Made with Bob
+} // namespace openpower::faultlog
