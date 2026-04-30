@@ -32,6 +32,7 @@ using ::openpower::guard::GuardRecords;
 using Timer = sdeventplus::utility::Timer<sdeventplus::ClockId::Monotonic>;
 
 #define GUARD_RESOLVED 0xFFFFFFFF
+constexpr float FAULTLOG_FORMAT_VERSION = 1.0;
 using Severity = sdbusplus::xyz::openbmc_project::Logging::server::Entry::Level;
 
 using Binary = std::vector<uint8_t>;
@@ -227,6 +228,10 @@ int main(int argc, char** argv)
         auto bus = sdbusplus::bus::new_default();
         auto event = sdeventplus::Event::get_default();
         nlohmann::json faultLogJson = json::array();
+
+        nlohmann::json version;
+        version["VERSION"] = FAULTLOG_FORMAT_VERSION;
+        faultLogJson.push_back(version);
 
         std::string propVal{};
         try

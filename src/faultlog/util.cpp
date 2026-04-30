@@ -105,7 +105,7 @@ json parseCallout(const std::string callout)
 
     // Regular expression to capture key-value pairs (ignores the starting
     // number)
-    // Example 
+    // Example
     // 1. LocationCode:xxxx, CCIN:XXX, SN:xxxx, PN:xxxx, Priority:xxx
     // 2. PN:xxxx, Priority:xxx
     std::regex pattern(
@@ -117,7 +117,7 @@ json parseCallout(const std::string callout)
     while (std::getline(stream, line))
     {
         if (!line.empty())
-        { // Ignore empty lines
+        {                    // Ignore empty lines
             lineCount += 1;
             json jsonObject; // JSON object to hold key-value pairs
             std::smatch matches;
