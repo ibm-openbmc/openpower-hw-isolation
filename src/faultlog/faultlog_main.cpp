@@ -15,6 +15,7 @@
 #include <sdeventplus/clock.hpp>
 #include <sdeventplus/source/event.hpp>
 #include <sdeventplus/utility/timer.hpp>
+#include <service_alerts_time.hpp>
 #include <unresolved_pels.hpp>
 #include <util.hpp>
 
