@@ -95,4 +95,116 @@ std::optional<time_t> readDisabledTimestamp(const std::string& filePath)
     }
 }
 
+bool checkUnresolvedPELs(sdbusplus::bus::bus& bus, uint64_t disabledTime)
+{
+    bool foundNewPEL = false;
+
+    try
+    {
+        using PropertyValue =
+            std::variant<std::string, bool, uint8_t, int16_t, uint16_t, int32_t,
+                         uint32_t, int64_t, uint64_t, double>;
+        using Properties = std::map<std::string, PropertyValue>;
+        using Interfaces = std::map<std::string, Properties>;
+        using Objects = std::map<sdbusplus::message::object_path, Interfaces>;
+
+        Objects objects;
+        auto method = bus.new_method_call(
+            "xyz.openbmc_project.Logging", "/xyz/openbmc_project/logging",
+            "org.freedesktop.DBus.ObjectManager", "GetManagedObjects");
+        auto reply = bus.call(method);
+        reply.read(objects);
+
+        for (const auto& [path, interfaces] : objects)
+        {
+            bool resolved = true;
+            bool deconfigured = false;
+            bool hidden = false;
+            bool guarded = false;
+            uint64_t timestamp = 0;
+
+            for (const auto& [intf, properties] : interfaces)
+            {
+                if (intf == "xyz.openbmc_project.Logging.Entry")
+                {
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "Resolved")
+                        {
+                            auto resolvedPtr = std::get_if<bool>(&propValue);
+                            if (resolvedPtr != nullptr)
+                            {
+                                resolved = *resolvedPtr;
+                            }
+                        }
+                        else if (prop == "Timestamp")
+                        {
+                            auto timestampPtr =
+                                std::get_if<uint64_t>(&propValue);
+                            if (timestampPtr != nullptr)
+                            {
+                                timestamp = *timestampPtr;
+                            }
+                        }
+                    }
+                }
+                else if (intf == "org.open_power.Logging.PEL.Entry")
+                {
+                    for (const auto& [prop, propValue] : properties)
+                    {
+                        if (prop == "Deconfig")
+                        {
+                            auto deconfigPtr = std::get_if<bool>(&propValue);
+                            if (deconfigPtr != nullptr)
+                            {
+                                deconfigured = *deconfigPtr;
+                            }
+                        }
+                        else if (prop == "Guard")
+                        {
+                            auto guardPtr = std::get_if<bool>(&propValue);
+                            if (guardPtr != nullptr)
+                            {
+                                guarded = *guardPtr;
+                            }
+                        }
+                        else if (prop == "Hidden")
+                        {
+                            auto hiddenPtr = std::get_if<bool>(&propValue);
+                            if (hiddenPtr != nullptr)
+                            {
+                                hidden = *hiddenPtr;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check if this is an unresolved, serviceable PEL
+            // pel time stamp
+            if (!resolved && (deconfigured || guarded) && !hidden)
+            {
+                // Convert milliseconds to seconds and check if newer than
+                // disabled time
+                constexpr uint64_t msToSeconds = 1000;
+                const auto pelTimestampSeconds = timestamp / msToSeconds;
+                if (pelTimestampSeconds > disabledTime)
+                {
+                    lg2::info("Found new unresolved PEL after nagging was "
+                              "disabled. Path: {PATH}, Timestamp: {TIMESTAMP}",
+                              "PATH", path.str, "TIMESTAMP",
+                              pelTimestampSeconds);
+                    foundNewPEL = true;
+                    break; // Stop iteration
+                }
+            }
+        }
+    }
+    catch (const std::exception& e)
+    {
+        lg2::error("Failed to check unresolved PELs: {ERROR}", "ERROR", e);
+    }
+
+    return foundNewPEL;
+}
 } // namespace openpower::faultlog
