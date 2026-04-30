@@ -207,4 +207,33 @@ bool checkUnresolvedPELs(sdbusplus::bus::bus& bus, uint64_t disabledTime)
 
     return foundNewPEL;
 }
+
+void enableServiceAlerts(sdbusplus::bus::bus& bus)
+{
+    using namespace openpower::faultlog;
+    try
+    {
+        auto method = bus.new_method_call(
+            "xyz.openbmc_project.Settings", SEND_SERVICE_ALERTS_PATH,
+            "org.freedesktop.DBus.Properties", "Set");
+        method.append(SEND_SERVICE_ALERTS_IFACE, "Enabled",
+                      std::variant<bool>(true));
+        auto reply = bus.call(method);
+        if (reply.is_method_error())
+        {
+            lg2::error("Failed to re-enable service alerts via D-Bus");
+            return;
+        }
+        lg2::info("Service alerts re-enabled due to new errors");
+        // Remove timestamp file
+        if (std::filesystem::exists(NAG_DISABLED_TIMESTAMP_FILE))
+        {
+            std::filesystem::remove(NAG_DISABLED_TIMESTAMP_FILE);
+        }
+    }
+    catch (const std::exception& ex)
+    {
+        lg2::error("Failed to enable service alerts: {ERROR}", "ERROR", ex);
+    }
+}
 } // namespace openpower::faultlog
