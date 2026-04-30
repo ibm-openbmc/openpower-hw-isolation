@@ -59,4 +59,6 @@ bool checkUnresolvedPELs(sdbusplus::bus::bus& bus, uint64_t disabledTime);
  * @param[in] bus - D-Bus to attach to
  */
 void enableServiceAlerts(sdbusplus::bus::bus& bus);
+
 } // namespace openpower::faultlog
+// Made with Bob
