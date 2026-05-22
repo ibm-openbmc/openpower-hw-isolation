@@ -1,0 +1,11 @@
+[Unit]
+Description=Faultlog Service Alerts Monitor
+After=xyz.openbmc_project.Settings.service
+
+[Service]
+ExecStart=@bindir@/faultlog-service-alerts-monitor
+Restart=on-failure
+Type=simple
+
+[Install]
+WantedBy=multi-user.target

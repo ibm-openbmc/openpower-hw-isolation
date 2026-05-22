@@ -1,5 +1,6 @@
 #include <faultlog_policy.hpp>
 #include <phosphor-logging/lg2.hpp>
+#include <service_alerts_time.hpp>
 #include <util.hpp>
 
 namespace openpower::faultlog
@@ -52,6 +53,22 @@ void FaultLogPolicy::populate(sdbusplus::bus::bus& bus, nlohmann::json& nagJson)
         // predictive guard enabled or not
         // at present not present in BMC will leave it as true for now
         jsonPolicyVal["PREDICTIVE"] = true;
+
+        // service alerts enabled or not
+        bool serviceAlertsEnabled = true;
+        try
+        {
+            serviceAlertsEnabled = readProperty<bool>(
+                bus, "xyz.openbmc_project.Settings",
+                "/xyz/openbmc_project/hardware_isolation/send_service_alerts",
+                "xyz.openbmc_project.Object.Enable", "Enabled");
+        }
+        catch (const std::exception& ex)
+        {
+            lg2::info("Failed to read send_service_alerts property {ERROR}",
+                      "ERROR", ex);
+        }
+        jsonPolicyVal["SEND_SERVICE_ALERTS"] = serviceAlertsEnabled;
 
         json jsonPolicy = json::object();
         jsonPolicy["POLICY"] = std::move(jsonPolicyVal);
